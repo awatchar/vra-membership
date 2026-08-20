@@ -22,8 +22,21 @@ import type { OcrFailureReason, ThaiIdCardData } from '../providers';
  * comes back as null instead of failing the request.
  */
 
-/** A phone photo of a card, after the client has downscaled it. */
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+/**
+ * Upload ceiling for a card photo.
+ *
+ * Set to the most conservative figure iApp documents, because their own
+ * documentation contradicts itself: one page says 10 MB, the error table
+ * describes `413 FILE_IS_TOO_LARGE` as "file exceeds 2 MB". Allowing more than
+ * the provider accepts would turn a size problem into a `413` that maps to
+ * "this image cannot be read", and the applicant would be told to retake a
+ * photo that was perfectly readable but too big. Rejecting it here instead
+ * produces the message that names the real cause.
+ *
+ * The client downscales before upload (#17), so this ceiling should not be
+ * reached in normal use.
+ */
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 /**
  * Applicant-facing messages, one per failure reason.
@@ -85,15 +98,20 @@ export const ocrRoutes = new Hono<AppContext>().post('/ocr', async (c) => {
 
   const image = await readValidatedImage(c.req.raw, { maxBytes: MAX_IMAGE_BYTES });
 
+  // Resolved once: `providers.ocr` is a getter that builds the adapter and reads
+  // the secret on every access, so repeating it would do that work three times
+  // and hand each call a different instance.
+  const ocr = c.var.providers.ocr;
+
   const startedAt = Date.now();
-  const result = await c.var.providers.ocr.readThaiIdCardFront(image);
+  const result = await ocr.readThaiIdCardFront(image);
   const durationMs = Date.now() - startedAt;
 
   if (!result.ok) {
     // The reason is an enum value, not provider text, so it is safe to log.
     c.var.logger.warn({
       event: 'ocr.failed',
-      provider: c.var.providers.ocr.name,
+      provider: ocr.name,
       reason: result.reason,
       durationMs,
     });
@@ -101,11 +119,7 @@ export const ocrRoutes = new Hono<AppContext>().post('/ocr', async (c) => {
   }
 
   // Field names only. Logging any value here would be logging the card.
-  c.var.logger.info({
-    event: 'ocr.completed',
-    provider: c.var.providers.ocr.name,
-    durationMs,
-  });
+  c.var.logger.info({ event: 'ocr.completed', provider: ocr.name, durationMs });
 
   const { faceImage, ...fields } = result.data;
   const body: OcrResponseBody = {

@@ -166,12 +166,20 @@ describe('POST /api/ocr file validation', () => {
   });
 
   it('rejects an oversized upload', async () => {
-    const large = new Uint8Array(5 * 1024 * 1024);
+    // Over the 2 MB ceiling, which is set to iApp's most conservative
+    // documented limit so a size problem is reported as a size problem.
+    const large = new Uint8Array(3 * 1024 * 1024);
     large.set(JPEG_HEADER, 0);
 
     const response = await exports.default.fetch(ocrRequest(large));
 
     expect(response.status).toBe(413);
+  });
+
+  it('accepts an image just under the ceiling', async () => {
+    const response = await exports.default.fetch(ocrRequest(cardImage(2 * 1024 * 1024 - 1)));
+
+    expect(response.status).toBe(200);
   });
 
   it('rejects a request with no body', async () => {
