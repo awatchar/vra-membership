@@ -6,8 +6,9 @@
  *   keys, bank account details, or any personal data.
  * - Secrets live in Cloudflare Secrets (`wrangler secret put <NAME>`) and, for
  *   local development, in the git-ignored `.dev.vars` file. See `.env.example`.
- * - Resource identifiers below are placeholders until the Cloudflare account
- *   owner provisions the real D1 database and R2 buckets. See docs/deployment.md.
+ * - The D1 `database_id` values below are real but are not secrets: they only
+ *   identify a database, and access still requires an authenticated token.
+ *   Committing them is what makes a clean checkout deployable.
  */
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
@@ -35,7 +36,7 @@
     {
       "binding": "DB",
       "database_name": "vra-membership-dev",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "73c5ef46-3923-4216-b2cd-874655d008c8",
       "migrations_dir": "migrations"
     }
   ],
@@ -63,7 +64,7 @@
         {
           "binding": "DB",
           "database_name": "vra-membership-prod",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "cc6ace9f-77af-41a0-833b-55ec8595e2a7",
           "migrations_dir": "migrations"
         }
       ],
