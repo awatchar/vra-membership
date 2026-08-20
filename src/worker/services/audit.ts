@@ -1,4 +1,4 @@
-import type { ActorType, EventMetadata, Repository } from '../db';
+import type { ActorType, ApplicationEventInput, EventMetadata, Repository } from '../db';
 
 /**
  * Audit trail.
@@ -71,27 +71,34 @@ export interface AuditLog {
   recordOnce(input: AuditEventInput): Promise<boolean>;
 }
 
-export function createAuditLog(db: Repository): AuditLog {
+/** Shape accepted by the repository, with metadata already sanitised. */
+export function toEventInput(input: AuditEventInput): ApplicationEventInput {
+  const metadata = sanitizeAuditMetadata(input.metadata);
   return {
-    async record(input) {
-      const metadata = sanitizeAuditMetadata(input.metadata);
-      await db.events.append({
-        applicationId: input.applicationId,
-        eventType: input.eventType,
-        actorType: input.actorType,
-        actorId: input.actorId ?? null,
-        ...(metadata ? { metadata } : {}),
-      });
-    },
-
-    async recordOnce(input) {
-      // Not atomic on its own; callers that must be exactly-once pair this with
-      // a compare-and-set on the row the event describes.
-      if (await db.events.existsForApplication(input.applicationId, input.eventType)) {
-        return false;
-      }
-      await this.record(input);
-      return true;
-    },
+    applicationId: input.applicationId,
+    eventType: input.eventType,
+    actorType: input.actorType,
+    actorId: input.actorId ?? null,
+    ...(metadata ? { metadata } : {}),
   };
+}
+
+export function createAuditLog(db: Repository): AuditLog {
+  // Standalone functions rather than methods that reach for `this`, so a
+  // destructured `const { recordOnce } = audit` keeps working.
+  const record = async (input: AuditEventInput): Promise<void> => {
+    await db.events.append(toEventInput(input));
+  };
+
+  const recordOnce = async (input: AuditEventInput): Promise<boolean> => {
+    // Not atomic on its own; callers that must be exactly-once pair this with
+    // a compare-and-set on the row the event describes.
+    if (await db.events.existsForApplication(input.applicationId, input.eventType)) {
+      return false;
+    }
+    await record(input);
+    return true;
+  };
+
+  return { record, recordOnce };
 }

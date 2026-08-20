@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { APPLICATION_STATUSES } from '../../src/worker/db';
 import type { ApplicationStatus, Repository } from '../../src/worker/db';
-import { createAuditLog } from '../../src/worker/services/audit';
 import {
   allowedTargets,
   createStateMachine,
@@ -12,7 +11,7 @@ import {
 import { repository, seedApplication } from '../support/fixtures';
 
 function machine(repo: Repository) {
-  return createStateMachine(repo, createAuditLog(repo));
+  return createStateMachine(repo);
 }
 
 /** Walks an application to `target` through the legal happy path. */
@@ -306,6 +305,63 @@ describe('audit trail', () => {
     await machine(repo).transition(id, 'COMPLETED');
 
     await expect(repo.events.listByApplicationId(id)).resolves.toEqual([]);
+  });
+
+  it('writes the status and its events in one transaction', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+
+    // Every statement in the batch is guarded on the pre-transition status, so
+    // a compare-and-set that does not apply leaves no event behind. Calling the
+    // repository with a stale `from` simulates losing the race.
+    const applied = await repo.applications.transitionStatus({
+      id,
+      from: 'SUBMITTED',
+      to: 'MANAGER_NOTIFIED',
+      events: [
+        {
+          applicationId: id,
+          eventType: 'STATUS_CHANGED',
+          actorType: 'SYSTEM',
+          metadata: { from: 'SUBMITTED', to: 'MANAGER_NOTIFIED' },
+        },
+      ],
+    });
+
+    expect(applied).toBe(false);
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({ status: 'DRAFT' });
+    await expect(repo.events.listByApplicationId(id)).resolves.toEqual([]);
+  });
+
+  it('refuses a same-status transition at the repository level', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+
+    // A same-status call would satisfy the event guard without changing
+    // anything, which would record a transition that never happened.
+    await expect(
+      repo.applications.transitionStatus({
+        id,
+        from: 'DRAFT',
+        to: 'DRAFT',
+        events: [],
+      }),
+    ).rejects.toThrow(/must change the status/);
+  });
+
+  it('never leaves a status change without its audit event', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+    const stateMachine = machine(repo);
+
+    for (const status of HAPPY_PATH) {
+      await stateMachine.transition(id, status);
+    }
+
+    const changes = (await repo.events.listByApplicationId(id)).filter(
+      (event) => event.eventType === 'STATUS_CHANGED',
+    );
+    expect(changes).toHaveLength(HAPPY_PATH.length);
   });
 });
 

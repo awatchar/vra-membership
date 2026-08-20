@@ -1,5 +1,5 @@
 import type { ApplicationStatus, Repository } from '../db';
-import type { AuditLog } from './audit';
+import { toEventInput } from './audit';
 
 /**
  * Application state machine (Issue #1 section 41).
@@ -106,7 +106,7 @@ export interface StateMachine {
   ): Promise<TransitionOutcome>;
 }
 
-export function createStateMachine(db: Repository, audit: AuditLog): StateMachine {
+export function createStateMachine(db: Repository): StateMachine {
   return {
     async transition(applicationId, to, options = {}) {
       for (let attempt = 1; ; attempt += 1) {
@@ -125,16 +125,38 @@ export function createStateMachine(db: Repository, audit: AuditLog): StateMachin
           return { kind: 'NOT_ALLOWED', from, to };
         }
 
+        const actorType = options.actorType ?? 'SYSTEM';
+        const actorId = options.actorId ?? null;
+
+        // The domain event comes first so the trail reads in causal order:
+        // PAYMENT_VERIFIED, then STATUS_CHANGED.
+        const events = [
+          ...(options.domainEvent
+            ? [toEventInput({ applicationId, eventType: options.domainEvent, actorType, actorId })]
+            : []),
+          toEventInput({
+            applicationId,
+            eventType: STATUS_CHANGED_EVENT,
+            actorType,
+            actorId,
+            metadata: { from, to },
+          }),
+        ];
+
         // Compare-and-set against the exact status that was read, not against
         // every legal predecessor. Guarding on the wider set would let the write
         // succeed after a concurrent request had already moved the row, and the
         // audit event would then record a `from` that was never true.
-        const applied = await db.applications.updateStatusIf(
-          applicationId,
-          [from],
+        //
+        // Status and events go in one transaction, so a transition can never
+        // exist without its trail.
+        const applied = await db.applications.transitionStatus({
+          id: applicationId,
+          from,
           to,
-          options.timestamps ?? {},
-        );
+          timestamps: options.timestamps ?? {},
+          events,
+        });
 
         if (!applied) {
           // Another request won the race. Decide from fresh state rather than
@@ -151,26 +173,6 @@ export function createStateMachine(db: Repository, audit: AuditLog): StateMachin
           }
           return { kind: 'NOT_ALLOWED', from: current.status, to };
         }
-
-        const actorType = options.actorType ?? 'SYSTEM';
-        const actorId = options.actorId ?? null;
-
-        if (options.domainEvent) {
-          await audit.record({
-            applicationId,
-            eventType: options.domainEvent,
-            actorType,
-            actorId,
-          });
-        }
-
-        await audit.record({
-          applicationId,
-          eventType: STATUS_CHANGED_EVENT,
-          actorType,
-          actorId,
-          metadata: { from, to },
-        });
 
         return { kind: 'APPLIED', from, to };
       }

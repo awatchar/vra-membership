@@ -50,6 +50,11 @@ export interface RepositoryOptions {
 const DEFAULT_LIST_LIMIT = 50;
 const MAXIMUM_LIST_LIMIT = 200;
 
+/** Timestamps that a status change may set. Existing values are never cleared. */
+export type StatusTimestamps = Partial<
+  Record<'submittedAt' | 'managerAcknowledgedAt' | 'nbtcRecordedAt', string>
+> & { nbtcRecordedBy?: string };
+
 function isoNow(now: () => Date): string {
   return now().toISOString();
 }
@@ -90,15 +95,35 @@ export interface ApplicationRepository {
    * Compare-and-set on `status`. Returns false when the row was not in `from`,
    * which is how the state machine stays safe under concurrent requests
    * without a transaction.
+   *
+   * Records no audit event. Prefer `transitionStatus`, which cannot leave a
+   * status change without its trail.
    */
   updateStatusIf(
     id: string,
     from: readonly ApplicationStatus[],
     to: ApplicationStatus,
-    timestamps?: Partial<
-      Record<'submittedAt' | 'managerAcknowledgedAt' | 'nbtcRecordedAt', string>
-    > & { nbtcRecordedBy?: string },
+    timestamps?: StatusTimestamps,
   ): Promise<boolean>;
+  /**
+   * Compare-and-set on `status` plus its audit events, in one D1 batch and
+   * therefore one transaction.
+   *
+   * Writing the status and then the events as two round trips leaves a window
+   * where a failure produces a status change with no trail, and Issue #1
+   * requires the trail to be complete. Each event insert is guarded on the row
+   * already holding `to`, so if the compare-and-set did not apply, the events
+   * are skipped rather than recording something that did not happen.
+   *
+   * Returns false when the row was not in `from`.
+   */
+  transitionStatus(input: {
+    id: string;
+    from: ApplicationStatus;
+    to: ApplicationStatus;
+    timestamps?: StatusTimestamps;
+    events: readonly ApplicationEventInput[];
+  }): Promise<boolean>;
   list(query?: ApplicationListQuery): Promise<ApplicationRecord[]>;
 }
 
@@ -175,6 +200,69 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
 
   const run = async (statement: D1PreparedStatement): Promise<D1Result> =>
     withTranslatedErrors(async () => statement.run());
+
+  /** Compare-and-set on status. Never clears a timestamp that is already set. */
+  const statusUpdate = (
+    id: string,
+    from: readonly ApplicationStatus[],
+    to: ApplicationStatus,
+    timestamps: StatusTimestamps | undefined,
+  ): D1PreparedStatement =>
+    db
+      .prepare(
+        `update applications set
+           status = ?,
+           submitted_at = coalesce(?, submitted_at),
+           manager_acknowledged_at = coalesce(?, manager_acknowledged_at),
+           nbtc_recorded_at = coalesce(?, nbtc_recorded_at),
+           nbtc_recorded_by = coalesce(?, nbtc_recorded_by),
+           updated_at = ?
+         where id = ? and status in (${from.map(() => '?').join(', ')})`,
+      )
+      .bind(
+        to,
+        timestamps?.submittedAt ?? null,
+        timestamps?.managerAcknowledgedAt ?? null,
+        timestamps?.nbtcRecordedAt ?? null,
+        timestamps?.nbtcRecordedBy ?? null,
+        isoNow(now),
+        id,
+        ...from,
+      );
+
+  /**
+   * Inserts an audit event only if the application still holds `requiredStatus`.
+   *
+   * This must be the status *before* the transition, and these inserts must be
+   * batched *before* the status update. Guarding on the target status instead
+   * looks equivalent but is not: once one request has committed the change,
+   * every concurrent loser also sees the target status, so all of them would
+   * insert an event for a change only one of them made.
+   */
+  const guardedEventInsert = (
+    event: ApplicationEventInput,
+    applicationId: string,
+    requiredStatus: ApplicationStatus,
+  ): D1PreparedStatement =>
+    db
+      .prepare(
+        `insert into application_events (
+           id, application_id, event_type, metadata_json, actor_type, actor_id, created_at
+         )
+         select ?, ?, ?, ?, ?, ?, ?
+         where exists (select 1 from applications where id = ? and status = ?)`,
+      )
+      .bind(
+        newId(),
+        applicationId,
+        event.eventType,
+        event.metadata ? JSON.stringify(event.metadata) : null,
+        event.actorType,
+        event.actorId ?? null,
+        isoNow(now),
+        applicationId,
+        requiredStatus,
+      );
 
   const applications: ApplicationRepository = {
     async create(input) {
@@ -329,31 +417,29 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async updateStatusIf(id, from, to, timestamps) {
-      const placeholders = from.map(() => '?').join(', ');
-      const result = await run(
-        db
-          .prepare(
-            `update applications set
-               status = ?,
-               submitted_at = coalesce(?, submitted_at),
-               manager_acknowledged_at = coalesce(?, manager_acknowledged_at),
-               nbtc_recorded_at = coalesce(?, nbtc_recorded_at),
-               nbtc_recorded_by = coalesce(?, nbtc_recorded_by),
-               updated_at = ?
-             where id = ? and status in (${placeholders})`,
-          )
-          .bind(
-            to,
-            timestamps?.submittedAt ?? null,
-            timestamps?.managerAcknowledgedAt ?? null,
-            timestamps?.nbtcRecordedAt ?? null,
-            timestamps?.nbtcRecordedBy ?? null,
-            isoNow(now),
-            id,
-            ...from,
-          ),
-      );
+      const result = await run(statusUpdate(id, from, to, timestamps));
       return result.meta.changes > 0;
+    },
+
+    async transitionStatus({ id, from, to, timestamps, events }) {
+      if (from === to) {
+        // Both the guard and the update key off `from`, so a same-status call
+        // would record a transition that never happened.
+        throw new Error('A status transition must change the status');
+      }
+
+      // Events first, each guarded on the pre-transition status, then the
+      // compare-and-set. Every statement therefore keys off the same `from`, so
+      // either all of them apply or none of them do.
+      const statements = [
+        ...events.map((event) => guardedEventInsert(event, id, from)),
+        statusUpdate(id, [from], to, timestamps),
+      ];
+
+      const results = await withTranslatedErrors(async () => db.batch(statements));
+      // D1 runs a batch as one transaction. The update is last, so its change
+      // count is the answer to "did this transition apply".
+      return (results.at(-1)?.meta.changes ?? 0) > 0;
     },
 
     async list(query = {}) {
