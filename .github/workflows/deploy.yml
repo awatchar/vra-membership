@@ -1,0 +1,132 @@
+name: Deploy
+
+# Production delivery. Runs the same quality gates as CI and only then deploys,
+# so a commit can never reach production without passing them.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  quality:
+    name: Quality gates
+    uses: ./.github/workflows/quality.yml
+
+  deploy:
+    name: Deploy to production
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Requires the protected GitHub `production` environment. Reviewers and
+    # secrets are configured there; see docs/deployment.md.
+    environment:
+      name: production
+      url: https://member.vra.or.th
+    steps:
+      - name: Check whether production delivery is enabled
+        id: gate
+        env:
+          DEPLOY_ENABLED: ${{ vars.CLOUDFLARE_DEPLOY_ENABLED }}
+        run: |
+          if [ "${DEPLOY_ENABLED}" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Production delivery is not enabled yet"
+              echo
+              echo "Set the repository variable \`CLOUDFLARE_DEPLOY_ENABLED=true\` once the"
+              echo "Cloudflare resources and environment secrets listed in"
+              echo "\`docs/deployment.md\` exist. Until then this job is a no-op."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check out repository
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies from the lockfile
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Verify required deployment secrets are present
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "$(printenv "$name")" ]; then
+              echo "::error::Missing environment secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Build client bundle
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm run build:web
+
+      - name: Apply D1 migrations
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply DB --env production --remote
+
+      - name: Deploy worker
+        id: worker
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --env production
+
+      # Smoke test uses the health endpoint only: no PII, no provider calls.
+      - name: Smoke test the deployment
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          for attempt in 1 2 3 4 5; do
+            status="$(curl -sS -o /tmp/health.json -w '%{http_code}' \
+              https://member.vra.or.th/api/health || echo 000)"
+            if [ "$status" = "200" ]; then
+              echo "Health check passed on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Attempt ${attempt} returned HTTP ${status}; retrying."
+            sleep 10
+          done
+          echo "::error::Smoke test failed: /api/health did not return HTTP 200"
+          exit 1
+
+      - name: Record the deployed revision
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          {
+            echo "### Deployed"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Environment: production"
+            echo "- URL: https://member.vra.or.th"
+          } >> "$GITHUB_STEP_SUMMARY"

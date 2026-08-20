@@ -2,13 +2,13 @@
 
 ## Data classification
 
-| Class | Examples | Repository / logs |
-| --- | --- | --- |
-| Secret | API keys, webhook secrets, encryption keys | Never |
-| Restricted PII | citizen ID, address, DOB, member photo | Never |
-| Ephemeral image | full ID card, payment slip | Never persist |
+| Class             | Examples                                        | Repository / logs      |
+| ----------------- | ----------------------------------------------- | ---------------------- |
+| Secret            | API keys, webhook secrets, encryption keys      | Never                  |
+| Restricted PII    | citizen ID, address, DOB, member photo          | Never                  |
+| Ephemeral image   | full ID card, payment slip                      | Never persist          |
 | Internal metadata | request ID, internal application ID, error code | Allowed when minimized |
-| Public | documentation, public branding assets | Allowed |
+| Public            | documentation, public branding assets           | Allowed                |
 
 ## Required controls
 

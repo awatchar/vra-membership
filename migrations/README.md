@@ -1,0 +1,26 @@
+# D1 migrations
+
+Cloudflare D1 migrations for the membership database. `wrangler.jsonc` points
+`migrations_dir` here for both the development and the production environment.
+
+## Conventions
+
+- One file per change, named `NNNN_snake_case_description.sql` with a zero-padded
+  sequence, for example `0001_create_applications.sql`.
+- Migrations are append-only. Never edit a migration that has been applied to
+  production; add a forward-fix migration instead.
+- Every migration must be reviewable on its own and must state its rollback or
+  forward-fix path in the pull request.
+- Migrations contain schema and non-personal reference data only. Never commit
+  member data, production exports or seed rows derived from real people.
+
+## Commands
+
+```bash
+# List and apply locally (uses the local D1 instance under .wrangler/)
+npx wrangler d1 migrations list DB --env=""
+npx wrangler d1 migrations apply DB --env="" --local
+
+# Production is applied by the deployment workflow, not by hand.
+npx wrangler d1 migrations list DB --env production --remote
+```

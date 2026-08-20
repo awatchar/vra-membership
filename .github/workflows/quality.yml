@@ -1,0 +1,65 @@
+name: Quality gates
+
+# Reusable gate shared by CI (pull requests, pushes) and by the deployment
+# workflow, so nothing reaches production without the same checks.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # Wrangler telemetry is opt-out; CI must not phone home.
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  repository-baseline:
+    name: Repository baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate repository policy
+        shell: pwsh
+        run: ./scripts/validate-repository.ps1
+
+  application:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Providers run in mock mode: no test may call iApp, SlipOK or Resend.
+      - name: Test
+        run: npm test
+
+      - name: Build client and worker bundles
+        run: npm run build
+
+      - name: Validate the production worker configuration
+        run: npm run check:worker:production

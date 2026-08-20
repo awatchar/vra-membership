@@ -1,0 +1,71 @@
+/* Mobile-first baseline. Layout and components are added by the UI issues. */
+:root {
+  --vra-navy: #0f3d6e;
+  --vra-navy-dark: #0a2b4e;
+  --vra-surface: #ffffff;
+  --vra-surface-muted: #f4f6f9;
+  --vra-text: #16202b;
+  --vra-text-muted: #5b6673;
+  --vra-border: #d6dce4;
+  --vra-danger: #b3261e;
+  --vra-radius: 12px;
+  --vra-max-width: 34rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --vra-surface: #14181d;
+    --vra-surface-muted: #1c2229;
+    --vra-text: #eef2f6;
+    --vra-text-muted: #a6b0bb;
+    --vra-border: #2c343d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--vra-surface-muted);
+  color: var(--vra-text);
+  font-family:
+    'Sarabun',
+    'Noto Sans Thai',
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+
+main {
+  margin: 0 auto;
+  max-width: var(--vra-max-width);
+  padding: 1.25rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.375rem;
+  line-height: 1.35;
+  margin: 0 0 0.75rem;
+}
+
+.vra-card {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: var(--vra-radius);
+  padding: 1.25rem;
+}
+
+.vra-muted {
+  color: var(--vra-text-muted);
+}
