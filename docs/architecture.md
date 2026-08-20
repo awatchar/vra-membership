@@ -45,6 +45,7 @@ src/worker/            Cloudflare Worker (Hono)
   lib/citizen-id.ts    citizen ID normalisation and check-digit validation
   lib/files.ts         magic-byte sniffing and size-limited body reads
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
+  providers/iapp/      Thai national ID OCR adapter; narrows the response
   providers/mock/      deterministic adapters used by development and tests
 src/web/               React client, built to dist/client
 migrations/            append-only D1 migrations
