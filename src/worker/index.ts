@@ -8,6 +8,7 @@ import { createLogger } from './lib/logger';
 import { ProviderNotConfiguredError, createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
 import { healthRoutes } from './routes/health';
+import { OcrFailedError, ocrRoutes } from './routes/ocr';
 
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
 const PROVIDER_ERROR_MESSAGE = 'ไม่สามารถเชื่อมต่อบริการภายนอกได้ กรุณาลองใหม่อีกครั้ง';
@@ -59,6 +60,7 @@ app.use('*', async (c, next) => {
 });
 
 app.route('/api', healthRoutes);
+app.route('/api', ocrRoutes);
 
 /** API 404s must be JSON so the SPA fallback never masks a routing mistake. */
 app.notFound((c) => {
@@ -77,6 +79,22 @@ app.onError((error, c) => {
     // `validationErrorBody` carries only the paths.
     logger.warn({ event: 'request.failed', errorCode: error.code, count: error.fields.length });
     return c.json(validationErrorBody(error, requestId), 422);
+  }
+
+  if (error instanceof OcrFailedError) {
+    // The reason lets the client choose between offering a retake and offering
+    // manual entry. It is an enum value, never provider text.
+    return c.json(
+      {
+        error: {
+          code: error.code,
+          reason: error.reason,
+          message: error.publicMessage,
+          ...(requestId ? { requestId } : {}),
+        },
+      },
+      422,
+    );
   }
 
   if (error instanceof ApiError) {

@@ -32,6 +32,15 @@ export interface MockOcrOptions {
   failWith?: Extract<OcrResult, { ok: false }>['reason'];
 }
 
+/**
+ * Smallest image the mock will read.
+ *
+ * The real provider rejects images whose dimensions are too small to hold a
+ * card (`INVALID_IMAGE_SIZE`). Mirroring that gives tests a realistic way to
+ * exercise the failure path, rather than needing a backdoor in the factory.
+ */
+const MINIMUM_CARD_IMAGE_BYTES = 64;
+
 export function createMockOcrProvider(options: MockOcrOptions = {}): OcrProvider {
   return {
     name: 'mock-ocr',
@@ -39,7 +48,7 @@ export function createMockOcrProvider(options: MockOcrOptions = {}): OcrProvider
       if (options.failWith) {
         return { ok: false, reason: options.failWith };
       }
-      if (image.bytes.byteLength === 0) {
+      if (image.bytes.byteLength < MINIMUM_CARD_IMAGE_BYTES) {
         return { ok: false, reason: 'PROVIDER_REJECTED_IMAGE' };
       }
       return { ok: true, data: { ...MOCK_ID_CARD, ...options.data } };
