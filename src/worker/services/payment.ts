@@ -33,14 +33,6 @@ const MAX_TRANSFER_SKEW_MS = 15 * 60 * 1000;
 const MIN_RECEIVER_DIGITS = 4;
 
 /**
- * Statuses that come before money has been taken.
- *
- * Used to tell "you have not got that far yet" apart from "you have already
- * paid", because those need different advice.
- */
-const PRE_PAYMENT_STATUSES: readonly string[] = ['DRAFT', 'AWAITING_PAYMENT', 'CANCELLED'];
-
-/**
  * Applicant-facing reasons (Issue #1 section 65).
  *
  * Each names the actual problem, because "payment verification failed" gives
@@ -178,7 +170,12 @@ export function createPaymentService(
       // payment and tell the applicant it went through. Checking first also
       // avoids spending a paid provider call on a request that cannot succeed.
       if (application.status !== 'AWAITING_PAYMENT') {
-        const alreadyPaid = !PRE_PAYMENT_STATUSES.includes(application.status);
+        // Whether money has already been taken is answered by looking for a
+        // payment, not by classifying the status. `REJECTED` in particular is
+        // reachable both before and after payment, so a status list would tell
+        // some applicants their money is refundable when they never paid, and
+        // others the opposite.
+        const alreadyPaid = (await db.payments.findByApplicationId(input.applicationId)).length > 0;
         await audit.record({
           applicationId: input.applicationId,
           eventType: 'PAYMENT_PRESENTED_WHEN_NOT_EXPECTED',

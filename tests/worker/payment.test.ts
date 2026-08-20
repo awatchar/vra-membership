@@ -478,6 +478,37 @@ describe('a payment that is not expected', () => {
     expect((error as PaymentRejectedError).reason).toBe('NOT_AWAITING_PAYMENT');
   });
 
+  it('does not claim a refund is available when nothing was ever paid', async () => {
+    const repo = repository();
+    const id = await readyToPay(repo);
+    // Rejected before paying. `REJECTED` is reachable both before and after
+    // payment, so classifying by status would have told this applicant their
+    // money is refundable when they never transferred any.
+    await createStateMachine(repo).transition(id, 'REJECTED');
+
+    const error = await service(repo)
+      .verify({ applicationId: id, evidence: QR })
+      .catch((reason: unknown) => reason);
+
+    expect((error as PaymentRejectedError).reason).toBe('NOT_AWAITING_PAYMENT');
+    expect((error as PaymentRejectedError).publicMessage).not.toContain('คืนเงิน');
+  });
+
+  it('does offer a refund route when a payment exists', async () => {
+    const repo = repository();
+    const id = await readyToPay(repo);
+    await service(repo).verify({ applicationId: id, evidence: QR });
+    await createStateMachine(repo).transition(id, 'REJECTED');
+
+    const error = await service(repo, { transaction: { transactionRef: 'SECOND-TXN' } })
+      .verify({ applicationId: id, evidence: QR })
+      .catch((reason: unknown) => reason);
+
+    // Same status as the previous test, opposite advice, because this applicant
+    // really did pay.
+    expect((error as PaymentRejectedError).reason).toBe('ALREADY_PAID');
+  });
+
   it('does not call the provider when a payment is not expected', async () => {
     const repo = repository();
     const id = await readyToPay(repo);
