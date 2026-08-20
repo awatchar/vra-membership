@@ -43,6 +43,7 @@ src/worker/            Cloudflare Worker (Hono)
     audit.ts           audit trail with an allowlist for metadata
     member-photo.ts    the only image the system keeps
     payment.ts         the five checks that accept a payment
+    receipt.ts         receipt issuing and regeneration
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
@@ -51,10 +52,13 @@ src/worker/            Cloudflare Worker (Hono)
   lib/files.ts         magic-byte sniffing and size-limited body reads
   lib/images.ts        dimension reading and JPEG metadata stripping
   lib/promptpay.ts     Thai QR Payment payload with an exact amount
+  lib/pdf/fonts.ts     Sarabun embedding, subsetted per document
+  lib/pdf/receipt.ts   the receipt document itself
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/iapp/      Thai national ID OCR adapter; narrows the response
   providers/slipok/    payment slip verification adapter
   providers/mock/      deterministic adapters used by development and tests
+assets/fonts/          Sarabun (OFL), vendored so a receipt never needs the network
 src/web/               React client, built to dist/client
 migrations/            append-only D1 migrations
 tests/                 Vitest suites, all running inside workerd
@@ -201,6 +205,24 @@ Admin endpoint ที่เปลี่ยนสถานะเพิ่มอ�
 จำนวนเงินเป็นจำนวนเต็มหน่วยสตางค์ทุกจุด ยอดจาก SlipOK ถูกปัดเป็นสตางค์ที่ขอบระบบ เพื่อให้การเปรียบเทียบทุกครั้งเป็นการเทียบจำนวนเต็ม
 
 รูปสลิปไม่ถูกเก็บ และในเส้นทางหลักมันไม่ถึง Worker เลย: browser อ่าน QR แล้วส่งเฉพาะ payload (Issue #1 หัวข้อ 18)
+
+## Receipts
+
+ใบสำคัญรับเงินออกทันทีที่ payment ผ่านการตรวจ ไม่ต้องรอผู้จัดการ เพราะมันยืนยันเรื่องเดียวคือ **สมาคมได้รับเงินแล้ว** ส่วนการบันทึกทะเบียนกับ กสทช. เป็นข้อเท็จจริงอีกเรื่องที่เกิดตามมาภายหลัง เอกสารจึงพูดเรื่องนี้ตรง ๆ ว่าไม่ใช่หลักฐานการบันทึกทะเบียน — ผู้สมัครที่อ่านผิดจะเลิกรอ email ที่บอกว่าขึ้นทะเบียนแล้วจริง
+
+**ไฟล์ PDF ไม่ถูกเก็บที่ไหนเลย** ทั้ง D1 และ R2 (Issue #1 หัวข้อ 26) ของจริงที่คงอยู่คือ receipt record ใน D1 และ `renderReceiptPdf` รับค่าทุกตัวจาก caller ไม่ไปอ่านเองในฟังก์ชัน จึงมี code path เดียวสำหรับการออกครั้งแรกและการ regenerate ภายหลัง — "สร้างใหม่ให้เหมือนเดิม" เป็นคุณสมบัติที่พิสูจน์ได้ ไม่ใช่การประกอบขึ้นใหม่ให้ใกล้เคียง
+
+`issue()` เป็น idempotent: ถ้ามีใบแล้วก็คืนใบนั้น และถ้าสองคำขอชนกันจนฝ่ายที่แพ้ติด unique constraint ของตาราง ฝ่ายที่แพ้จะได้ใบที่ชนะไป ไม่ใช่ error เพราะสิ่งที่ผู้เรียกถามคือ "ใบของใบสมัครนี้" ซึ่งตอนนี้มีแล้ว การออกเลขที่สองบน payment เดียวจะทำให้เอกสารที่สมาชิกถืออยู่กับในระบบอ้างเลขต่างกัน
+
+### Thai text ใน PDF
+
+Standard PDF fonts เขียนภาษาไทยไม่ได้เลย — `drawText` throw ไม่ใช่ออกมาเป็นตัวอักษรเพี้ยน จึงฝัง Sarabun (OFL) ไว้ใน repository และ subset ต่อเอกสาร ทำให้ใบเสร็จหนึ่งใบราว 12 KB แทนที่จะแบก font ทั้งชุดราว 180 KB ไปกับ email ทุกฉบับ
+
+Sarabun จัดตำแหน่งสระและวรรณยุกต์ด้วยการ **แทน glyph ผ่าน GSUB** ไม่ใช่ขยับด้วย GPOS offset ดังนั้น layout run จะรายงาน offset เป็นศูนย์ทั้งหมดแม้จัดรูปถูกต้องแล้ว สิ่งที่เปลี่ยนคือ glyph ที่เลือก — `น้` กับ `น้ำ` ใช้ glyph วรรณยุกต์ต่างตัวกันเพราะต้องวางไม่เหมือนกันเมื่อมีสระอำตามหลัง การ assert บน offset จึงดูเหมือน fail ทั้งที่ถูก test จริงคือ assert ว่า glyph id เปลี่ยนตามบริบท
+
+ผลข้างเคียงที่ทราบแล้วอย่างหนึ่ง: สระอำถูกจัดรูปเป็น นิคหิต + สระอา และสระอาที่ใช้เป็น glyph **ตัวเดียวกัน** กับสระอาเดี่ยว pdf-lib เขียน `/ToUnicode` หนึ่งรายการต่อ glyph จากบริบทแรกที่พบ จึงเสียการอ่านย้อนกลับไปหนึ่งแบบต่อ font glyph ที่วาดถูกต้องเสมอ **หน้าจอและกระดาษจึงถูกต้อง** ที่คลาดเคลื่อนคือการ copy ข้อความออกจากไฟล์เท่านั้น test เปรียบเทียบโดยตัดสระอา/อำ ออกจากทั้งสองฝั่ง (`tests/support/pdf-text.ts`) ตัวอื่นทั้งหมดยังตรวจตรงตัวรวมทั้งลำดับ
+
+Endpoint สำหรับ admin regenerate ยังไม่เปิด เพราะสิทธิ์ในการดึงเอกสารที่มี PII ต้องผ่าน admin authentication ซึ่งมาพร้อม Cloudflare Access ใน #16 — service มี `render()` พร้อมแล้วและรอเพียงชั้นสิทธิ์
 
 ## Decision records
 

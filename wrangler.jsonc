@@ -16,6 +16,10 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The receipt PDF embeds a Thai font, which has to reach the Worker as bytes.
+  // Without this rule the .ttf import is treated as text and the font is
+  // corrupted in a way that only shows up as unreadable output.
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": false }],
   "workers_dev": false,
   "observability": {
     "enabled": true,

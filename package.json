@@ -24,7 +24,9 @@
     "check:worker:production": "wrangler deploy --dry-run --env production"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "hono": "^4.13.3",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
