@@ -1,4 +1,4 @@
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -7,21 +7,31 @@ import { defineConfig } from 'vitest/config';
  *
  * Provider calls are always mocked: no test may reach iApp, SlipOK or Resend
  * (AGENTS.md), which `PROVIDER_MODE=mock` below enforces.
+ *
+ * `TEST_MIGRATIONS` carries the real migration files into the test worker so
+ * schema tests run against the same SQL that ships to production, rather than
+ * against a hand-written copy that can drift.
  */
-export default defineConfig({
-  plugins: [
-    cloudflareTest({
-      wrangler: { configPath: './wrangler.jsonc' },
-      miniflare: {
-        bindings: {
-          ENVIRONMENT: 'development',
-          PROVIDER_MODE: 'mock',
-          APP_BASE_URL: 'http://localhost:8787',
+export default defineConfig(async () => {
+  const migrations = await readD1Migrations('./migrations');
+
+  return {
+    plugins: [
+      cloudflareTest({
+        wrangler: { configPath: './wrangler.jsonc' },
+        miniflare: {
+          bindings: {
+            ENVIRONMENT: 'development',
+            PROVIDER_MODE: 'mock',
+            APP_BASE_URL: 'http://localhost:8787',
+            TEST_MIGRATIONS: migrations,
+          },
         },
-      },
-    }),
-  ],
-  test: {
-    include: ['tests/**/*.test.ts'],
-  },
+      }),
+    ],
+    test: {
+      include: ['tests/**/*.test.ts'],
+      setupFiles: ['./tests/setup/storage.ts'],
+    },
+  };
 });

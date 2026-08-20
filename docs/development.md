@@ -78,6 +78,19 @@ Automated tests ห้ามยิง iApp, SlipOK หรือ Resend จริ
 
 Test fixtures ต้องเป็นข้อมูลสังเคราะห์ที่ย้อนกลับไปหาบุคคลจริงไม่ได้
 
+## Database
+
+Schema อยู่ใน `migrations/` แบบ append-only และ data access ทั้งหมดผ่าน `src/worker/db/` ซึ่งเป็นโมดูลเดียวที่รู้จัก SQL และ column name
+
+```bash
+npx wrangler d1 migrations list DB --env=""
+npx wrangler d1 migrations apply DB --env="" --local
+```
+
+Test suite ใช้ไฟล์ migration จริงผ่าน `readD1Migrations` และล้างข้อมูลก่อนทุก test ใน `tests/setup/storage.ts` จึงไม่มี test ที่พึ่งข้อมูลที่ test อื่นทิ้งไว้
+
+เลขบัตรประชาชนไม่ถูกเก็บเป็น plain text `src/worker/lib/crypto.ts` แยก subkey ด้วย HKDF เป็นสองชุด ชุดหนึ่งสำหรับ AES-GCM และอีกชุดสำหรับ keyed hash ที่ใช้ค้นหาซ้ำ ดังนั้น index ที่ใช้ค้นหาไม่สามารถถอดรหัสอะไรได้
+
 ## Logging
 
 Worker ต้อง log ผ่าน `src/worker/lib/logger.ts` เท่านั้น logger ใช้ allowlist ของ field ทางเทคนิค และตัด field อื่นทั้งหมดทิ้ง ESLint บล็อก `console` ใน `src/worker/**` เพื่อกันการ log PII โดยไม่ตั้งใจ

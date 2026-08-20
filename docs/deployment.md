@@ -49,6 +49,14 @@ Pipeline ประกอบด้วยสาม workflow
    | `VRA_BANK_ACCOUNT`      | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
    | `VRA_BANK_ACCOUNT_NAME` | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
 
+   `PII_ENCRYPTION_KEY` ต้องเป็นค่าสุ่มความยาวอย่างน้อย 32 bytes สร้างด้วย
+
+   ```bash
+   openssl rand -base64 48
+   ```
+
+   ระบบใช้ไบต์ของสตริงนี้เป็น input ของ HKDF โดยตรง ไม่มีการ decode base64 ดังนั้นต้องใช้ค่าเดิมทั้งสตริงตลอดอายุของข้อมูล การเปลี่ยนค่านี้ทำให้ ciphertext และ hash ที่มีอยู่ใช้ไม่ได้ จึงต้องมีแผน re-encrypt ก่อน rotate ทุกครั้ง
+
    ค่าทั้งหมดตั้งผ่าน Cloudflare เท่านั้น ห้ามใส่ใน `wrangler.jsonc`, Issue, PR หรือ log แม้ข้อมูลบัญชีธนาคารจะเผยแพร่ต่อผู้สมัครก็ไม่เก็บลง repository
 
 5. สร้าง Cloudflare Access application ครอบ `/admin*` และ `/api/admin/*` แล้วกำหนดผู้ใช้ที่เข้าได้
