@@ -42,6 +42,7 @@ Pipeline ประกอบด้วยสาม workflow
    | `SLIPOK_API_KEY`        | SlipOK slip verification          |
    | `RESEND_API_KEY`        | Resend transactional email        |
    | `RESEND_WEBHOOK_SECRET` | ตรวจ signature ของ Resend webhook |
+   | `TURNSTILE_SECRET_KEY`  | ตรวจ Turnstile token ฝั่ง server  |
    | `PII_ENCRYPTION_KEY`    | เข้ารหัสเลขบัตรประชาชนใน D1       |
    | `MANAGER_EMAIL`         | ผู้รับ email แจ้งใบสมัครใหม่      |
    | `EMAIL_FROM`            | sender ของ transactional email    |
@@ -61,7 +62,9 @@ Pipeline ประกอบด้วยสาม workflow
 
 5. สร้าง Cloudflare Access application ครอบ `/admin*` และ `/api/admin/*` แล้วกำหนดผู้ใช้ที่เข้าได้
 
-6. สร้าง Turnstile site และเก็บ secret key เป็น Cloudflare Secret เมื่อ issue ที่ใช้งาน Turnstile ถูก implement
+6. สร้าง Turnstile site แล้วเก็บ secret key เป็น Cloudflare Secret ชื่อ `TURNSTILE_SECRET_KEY` ส่วน site key เป็นค่าสาธารณะที่อยู่ใน client bundle
+
+   เพิ่ม Cloudflare rate limiting rule ที่ระดับ edge สำหรับ `/api/ocr`, `/api/payment/verify` และ `/api/member-photo` ด้วย ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า Worker invocation และค่า D1 write ที่ counter ใช้
 
 7. สร้าง GitHub environment ชื่อ `production` (Settings -> Environments) โดยเปิด required reviewers และจำกัด deployment branch เป็น `main` แล้วเพิ่ม environment secrets
 

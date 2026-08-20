@@ -176,6 +176,23 @@ export interface EventRepository {
   existsForApplication(applicationId: string, eventType: string): Promise<boolean>;
 }
 
+export interface RateLimitRepository {
+  /**
+   * Counts one request in a window and returns the new total.
+   *
+   * The insert-or-increment is a single statement, so two concurrent requests
+   * cannot both read the same count and write back the same value. Expired
+   * windows are removed in the same batch, which keeps the table small without
+   * a scheduled job.
+   */
+  increment(input: {
+    bucket: string;
+    windowStart: number;
+    /** Windows starting before this instant are deleted. */
+    expireBefore: number;
+  }): Promise<number>;
+}
+
 export interface Repository {
   applications: ApplicationRepository;
   addresses: AddressRepository;
@@ -183,6 +200,7 @@ export interface Repository {
   receipts: ReceiptRepository;
   emails: EmailRepository;
   events: EventRepository;
+  rateLimits: RateLimitRepository;
 }
 
 export function createRepository(db: D1Database, options: RepositoryOptions = {}): Repository {
@@ -832,5 +850,29 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
   };
 
-  return { applications, addresses, payments, receipts, emails, events };
+  const rateLimits: RateLimitRepository = {
+    async increment({ bucket, windowStart, expireBefore }) {
+      const [incremented] = await withTranslatedErrors(async () =>
+        db.batch<{ count: number }>([
+          db
+            .prepare(
+              `insert into rate_limits (bucket, window_start, count)
+               values (?, ?, 1)
+               on conflict (bucket, window_start) do update set count = count + 1
+               returning count`,
+            )
+            .bind(bucket, windowStart),
+          db.prepare('delete from rate_limits where window_start < ?').bind(expireBefore),
+        ]),
+      );
+
+      const count = incremented?.results[0]?.count;
+      if (typeof count !== 'number') {
+        throw new Error('Rate limit counter did not return a count');
+      }
+      return count;
+    },
+  };
+
+  return { applications, addresses, payments, receipts, emails, events, rateLimits };
 }
