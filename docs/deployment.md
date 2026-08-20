@@ -29,7 +29,26 @@ Pipeline ประกอบด้วยสาม workflow
 
 3. ผูก custom domain `member.vra.or.th` เข้ากับ Worker `vra-membership`
 
-4. ตั้ง Cloudflare Secrets สำหรับ production ผ่าน `wrangler secret put <NAME> --env production`
+4. ตั้ง Cloudflare Secrets สำหรับ production
+
+   วิธีที่เร็วที่สุดคือใช้สคริปต์ที่เตรียมไว้ ซึ่งอ่านค่าจากไฟล์เดียวที่ถูก git-ignore แล้วอัปโหลดทั้งชุดในครั้งเดียว โดยค่าไม่ผ่าน command line และไม่ค้างใน shell history
+
+   ```powershell
+   # สร้าง template แล้วกรอกค่าลงไปครั้งเดียว
+   pwsh -File ./scripts/set-production-secrets.ps1 -CreateTemplate
+
+   # ตรวจว่าครบก่อนอัปโหลดจริง
+   pwsh -File ./scripts/set-production-secrets.ps1 -WhatIf
+
+   # อัปโหลด
+   pwsh -File ./scripts/set-production-secrets.ps1
+   ```
+
+   ปล่อย `PII_ENCRYPTION_KEY` ว่างไว้เพื่อให้สคริปต์สร้างค่าสุ่มให้ และ **สำรองค่านั้นไว้ที่ปลอดภัยและออฟไลน์ก่อนลบไฟล์** เพราะถ้าค่านี้หาย เลขบัตรประชาชนที่เก็บไว้จะอ่านไม่ได้อีกเลย
+
+   ลบไฟล์ค่าเมื่อเสร็จ และห้ามนำค่าใด ๆ ไปวางใน Issue, PR หรือแชท
+
+   หรือตั้งทีละตัวด้วย `wrangler secret put <NAME> --env production`
 
    | Secret                  | ใช้ทำอะไร                         |
    | ----------------------- | --------------------------------- |
