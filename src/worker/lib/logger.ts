@@ -23,6 +23,8 @@ const ALLOWED_FIELDS = [
   'errorCode',
   'provider',
   'providerStatus',
+  // Enum-valued: 'ID_CARD' or 'UPLOAD' for a member photo. Never a file name.
+  'source',
   'attempt',
   'count',
   'reason',
