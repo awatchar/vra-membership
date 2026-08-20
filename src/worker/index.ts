@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppContext } from './context';
 import { ConfigurationError, readConfig } from './env';
 import { ApiError, errorBody, statusForErrorCode } from './lib/http';
@@ -9,6 +10,17 @@ import { healthRoutes } from './routes/health';
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
 const PROVIDER_ERROR_MESSAGE = 'ไม่สามารถเชื่อมต่อบริการภายนอกได้ กรุณาลองใหม่อีกครั้ง';
 
+/**
+ * `CF-Ray` lets a request be correlated with Cloudflare's own logs, but it
+ * arrives as a header, so it is only trusted when it looks like a ray id.
+ * Anything else gets a locally generated id instead of being echoed into logs.
+ */
+const RAY_ID_PATTERN = /^[a-zA-Z0-9-]{1,40}$/;
+
+function resolveRequestId(header: string | undefined): string {
+  return header && RAY_ID_PATTERN.test(header) ? header : crypto.randomUUID();
+}
+
 const app = new Hono<AppContext>();
 
 /**
@@ -16,7 +28,7 @@ const app = new Hono<AppContext>();
  * provider container. Nothing here reads the request body.
  */
 app.use('*', async (c, next) => {
-  const requestId = c.req.header('cf-ray') ?? crypto.randomUUID();
+  const requestId = resolveRequestId(c.req.header('cf-ray'));
   const config = readConfig(c.env);
 
   c.set('requestId', requestId);
@@ -59,7 +71,7 @@ app.onError((error, c) => {
     logger.warn({ event: 'request.failed', errorCode: error.code });
     return c.json(
       errorBody(error.code, error.publicMessage, requestId),
-      statusForErrorCode(error.code) as 400,
+      statusForErrorCode(error.code) as ContentfulStatusCode,
     );
   }
 

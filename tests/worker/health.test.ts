@@ -43,3 +43,25 @@ describe('bindings', () => {
     expect(object).not.toBeNull();
   });
 });
+
+describe('request correlation id', () => {
+  it('reuses a well-formed CF-Ray header', async () => {
+    const response = await exports.default.fetch(
+      new Request('http://localhost/api/health', { headers: { 'cf-ray': 'abc123-BKK' } }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({ requestId: 'abc123-BKK' });
+  });
+
+  it('ignores a CF-Ray header that could pollute logs', async () => {
+    const response = await exports.default.fetch(
+      new Request('http://localhost/api/health', {
+        headers: { 'cf-ray': 'x".repeat-injection {"level":"error"' },
+      }),
+    );
+
+    const body = (await response.json()) as { requestId: string };
+    expect(body.requestId).not.toContain('injection');
+    expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
