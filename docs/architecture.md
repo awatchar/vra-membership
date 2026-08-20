@@ -38,12 +38,14 @@ src/worker/            Cloudflare Worker (Hono)
     state-machine.ts   validated, idempotent, concurrency-safe transitions
     numbering.ts       application and receipt numbers
     audit.ts           audit trail with an allowlist for metadata
+    member-photo.ts    the only image the system keeps
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
   lib/crypto.ts        citizen ID encryption and duplicate-lookup hashing
   lib/citizen-id.ts    citizen ID normalisation and check-digit validation
   lib/files.ts         magic-byte sniffing and size-limited body reads
+  lib/images.ts        dimension reading and JPEG metadata stripping
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/iapp/      Thai national ID OCR adapter; narrows the response
   providers/mock/      deterministic adapters used by development and tests
@@ -142,6 +144,28 @@ Admin endpoint ที่เปลี่ยนสถานะเพิ่มอ�
 - **ข้อความ error ไม่มีค่าที่ผู้ใช้ส่งมา** ค่าเหล่านั้นคือเลขบัตร ที่อยู่ และ email ตอบกลับเฉพาะ path ของ field กับข้อความภาษาไทยตามชนิดของข้อผิดพลาด
 - **Rate limit counter อยู่ใน D1 ไม่ใช่ในหน่วยความจำของ isolate** Worker หนึ่งตัวรันหลาย isolate พร้อมกัน counter ในหน่วยความจำจึงไม่จำกัดอะไรเลย และ bucket ที่เก็บเป็น keyed hash ของ `<scope>:<identifier>` ไม่ใช่ IP ตรง ๆ
 - **rate limit ใน application layer ไม่แทน rule ที่ edge** rule ของ Cloudflare หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้ ต้องตั้งทั้งสองชั้น
+
+## Images
+
+ระบบแตะภาพสามชนิดและปฏิบัติกับมันต่างกันโดยเจตนา
+
+| ภาพ                       | ที่อยู่        | อายุ                   |
+| ------------------------- | -------------- | ---------------------- |
+| บัตรประชาชนด้านหน้า       | request memory | ถูกทิ้งเมื่อจบ request |
+| สลิปการชำระเงิน           | request memory | ถูกทิ้งเมื่อจบ request |
+| รูปสมาชิกที่ผู้สมัครเลือก | private R2     | เก็บไว้เพื่อทำบัตร     |
+
+รูปสมาชิกเป็นภาพเดียวที่ถูกเก็บ กฎที่บังคับไว้
+
+- **Object key เป็น UUID สุ่ม** ไม่มีเลขบัตร ชื่อ callsign หรือ application id อยู่ในนั้น การ list bucket ต้องไม่กลายเป็นทะเบียนสมาชิก
+- **ไม่มี R2 custom metadata** เพราะเป็นอีกที่ที่ข้อมูลส่วนบุคคลจะสะสมได้ ความเชื่อมโยงอยู่ใน database แล้ว
+- **การเปลี่ยนรูปลบ object เดิม** ถ้าไม่ลบ การถ่ายใหม่ทุกครั้งจะทิ้งใบหน้าที่ไม่มีอะไรอ้างถึงไว้ใน bucket และไม่มีใครจะไปลบมัน
+- **EXIF ถูกลบก่อนเขียนลง bucket** ภาพจากมือถืออาจมีพิกัด GPS หมายเลขเครื่อง และเวลาถ่าย เมื่อผูกกับใบหน้าของคนที่ระบุตัวได้ นั่นคือประวัติตำแหน่ง
+- **ต้องมีการยืนยันอย่างชัดเจน** การใช้ภาพใบหน้าจากบัตรโดยผู้สมัครไม่ได้เลือกเองคือสิ่งที่ Issue #1 หัวข้อ 61 ห้าม
+
+การครอบตัดและ re-encode ทำที่ browser ส่วน Worker เป็นฝ่าย **ตรวจ** ไม่ใช่เชื่อ: อ่านขนาดพิกเซลจาก container header (ไม่ต้องมี decoder) ตรวจสัดส่วน 3:4 และลบ metadata segment ทิ้ง Worker ไม่มี canvas และการใส่ WASM decoder จะเพิ่ม bundle size กับ CPU ทุก upload โดยไม่คุ้มที่ปริมาณ 1-2 ใบสมัครต่อวัน
+
+รับเฉพาะ JPEG สำหรับรูปที่เก็บ เพราะ metadata ของ PNG และ WebP อยู่ใน chunk ที่โมดูลนี้ไม่ได้เขียนใหม่ การรับไว้จะเท่ากับเก็บ chunk ที่อาจมี EXIF หรือข้อความติดมา
 
 ## Decision records
 
