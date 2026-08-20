@@ -28,6 +28,12 @@ src/worker/            Cloudflare Worker (Hono)
     mappers.ts         row to model conversion
     repository.ts      parameterised queries grouped per aggregate
     errors.ts          constraint-violation translation
+  security/            controls applied before business rules run
+    turnstile.ts       bot protection, verified before any provider call
+    rate-limit.ts      fixed-window counters in D1, hashed identifiers
+    csrf.ts            origin check plus double-submit token for admin POSTs
+    validation.ts      strict zod parsing that never echoes a submitted value
+    context.ts         per-request assembly of the above
   services/            business rules; no SQL, no HTTP
     state-machine.ts   validated, idempotent, concurrency-safe transitions
     numbering.ts       application and receipt numbers
@@ -37,6 +43,7 @@ src/worker/            Cloudflare Worker (Hono)
   lib/http.ts          API error codes and applicant-safe messages
   lib/crypto.ts        citizen ID encryption and duplicate-lookup hashing
   lib/citizen-id.ts    citizen ID normalisation and check-digit validation
+  lib/files.ts         magic-byte sniffing and size-limited body reads
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/mock/      deterministic adapters used by development and tests
 src/web/               React client, built to dist/client
@@ -110,6 +117,30 @@ COMPLETED, CANCELLED and REFUNDED are terminal
 `VRA-{พ.ศ.}-{running}` และ `VRA-RC-{พ.ศ.}-{running}` โดย prefix และความยาว sequence เป็น config ปี พ.ศ. คำนวณจากเวลา Asia/Bangkok ไม่ใช่จากวัน UTC ใบสมัครที่ส่งเวลา 23:30 UTC ของวันที่ 31 ธันวาคม จึงได้เลขของปีถัดไป
 
 ความไม่ซ้ำเป็นการรับประกันจาก `UNIQUE` constraint ไม่ใช่จาก application layer ระบบเสนอเลขจากค่าสูงสุดที่ออกไปแล้วบวกหนึ่ง แล้วให้ constraint ตัดสิน ผู้แพ้อ่านค่าสูงสุดใหม่และลองอีกครั้ง จึงได้ลำดับที่ไม่ซ้ำและไม่มีเลขขาดหาย
+
+## Public endpoint controls
+
+ทุก endpoint สาธารณะที่มีค่าใช้จ่ายต้องผ่านลำดับนี้ก่อนถึง business logic
+
+```text
+request
+  -> Turnstile        ตรวจก่อนเรียก provider ใด ๆ เพราะการตรวจทีหลังยังทำให้เกิดค่าใช้จ่าย
+  -> rate limit       fixed window ใน D1 ต่อ scope และต่อ client
+  -> file validation  sniff magic bytes และจำกัดขนาดระหว่างอ่าน stream
+  -> zod validation   strict object ปฏิเสธ field ที่ไม่รู้จัก
+  -> business logic
+```
+
+Admin endpoint ที่เปลี่ยนสถานะเพิ่มอีกสองชั้น: ตรวจ `Origin` และ double-submit CSRF token ที่เทียบแบบ constant time เพราะ Cloudflare Access ใช้ cookie ซึ่งถูกส่งไปกับ cross-site request ด้วย
+
+หลักที่ใช้ตัดสินใจ
+
+- **Content-Type ที่ client ส่งมาเป็นเพียงคำใบ้** ชนิดไฟล์ตัดสินจาก magic bytes ไฟล์ PDF หรือ script ที่เปลี่ยนนามสกุลเป็น `.jpg` ต้องไม่ถึง provider หรือ bucket
+- **ขนาดไฟล์ถูกบังคับระหว่างอ่าน ไม่ใช่หลังอ่านจบ** การ buffer ไฟล์ทั้งก้อนแล้วค่อยวัดคือวิธีที่ Worker ถูกฆ่าด้วย request เดียว
+- **Field ที่ไม่รู้จักถูกปฏิเสธ ไม่ใช่ถูกตัดออกเงียบ ๆ** client ที่ส่ง `amount` มาพร้อม `membershipType` เข้าใจ contract ผิด และการตัดออกเงียบ ๆ ปิดบังเรื่องนั้น
+- **ข้อความ error ไม่มีค่าที่ผู้ใช้ส่งมา** ค่าเหล่านั้นคือเลขบัตร ที่อยู่ และ email ตอบกลับเฉพาะ path ของ field กับข้อความภาษาไทยตามชนิดของข้อผิดพลาด
+- **Rate limit counter อยู่ใน D1 ไม่ใช่ในหน่วยความจำของ isolate** Worker หนึ่งตัวรันหลาย isolate พร้อมกัน counter ในหน่วยความจำจึงไม่จำกัดอะไรเลย และ bucket ที่เก็บเป็น keyed hash ของ `<scope>:<identifier>` ไม่ใช่ IP ตรง ๆ
+- **rate limit ใน application layer ไม่แทน rule ที่ edge** rule ของ Cloudflare หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้ ต้องตั้งทั้งสองชั้น
 
 ## Decision records
 

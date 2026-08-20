@@ -6,6 +6,7 @@ import { ConfigurationError, readConfig } from './env';
 import { ApiError, errorBody, statusForErrorCode } from './lib/http';
 import { createLogger } from './lib/logger';
 import { ProviderNotConfiguredError, createProviders } from './providers';
+import { ValidationError, createSecurityServices, validationErrorBody } from './security';
 import { healthRoutes } from './routes/health';
 
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
@@ -42,7 +43,9 @@ app.use('*', async (c, next) => {
     }),
   );
   c.set('providers', createProviders(c.env));
-  c.set('db', createRepository(c.env.DB));
+  const db = createRepository(c.env.DB);
+  c.set('db', db);
+  c.set('security', await createSecurityServices(c.env, db));
 
   const startedAt = Date.now();
   await next();
@@ -68,6 +71,13 @@ app.notFound((c) => {
 app.onError((error, c) => {
   const requestId = c.var.requestId as string | undefined;
   const logger = c.var.logger ?? createLogger();
+
+  if (error instanceof ValidationError) {
+    // Field paths are safe to return; the submitted values are not, and
+    // `validationErrorBody` carries only the paths.
+    logger.warn({ event: 'request.failed', errorCode: error.code, count: error.fields.length });
+    return c.json(validationErrorBody(error, requestId), 422);
+  }
 
   if (error instanceof ApiError) {
     logger.warn({ event: 'request.failed', errorCode: error.code });

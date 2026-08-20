@@ -98,14 +98,56 @@ async function deriveBits(master: CryptoKey, info: string): Promise<ArrayBuffer>
   );
 }
 
+async function importMaster(keyMaterial: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', decodeKeyMaterial(keyMaterial), 'HKDF', false, [
+    'deriveBits',
+  ]);
+}
+
+/**
+ * A keyed hash over an arbitrary label, derived from the same master secret but
+ * a different HKDF `info`, so it shares no key material with anything else.
+ *
+ * Used where an identifier must be stored or compared without storing the
+ * identifier itself - a client IP address in a rate-limit bucket, for instance,
+ * is personal data that has no business sitting in the database in clear.
+ */
+export interface KeyedHasher {
+  hash(value: string): Promise<string>;
+}
+
+export async function createKeyedHasher(keyMaterial: string, info: string): Promise<KeyedHasher> {
+  const bits = await deriveBits(await importMaster(keyMaterial), info);
+  const key = await crypto.subtle.importKey('raw', bits, { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+  ]);
+
+  return {
+    async hash(value: string): Promise<string> {
+      const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+      return toBase64Url(new Uint8Array(signature));
+    },
+  };
+}
+
+/**
+ * Constant-time comparison for secrets and tokens.
+ *
+ * `a === b` on strings short-circuits at the first differing byte, which leaks
+ * how much of a guess was correct. Length is compared first because it is not
+ * secret, and the loop then always runs over the full length.
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
 export async function createCitizenIdProtection(keyMaterial: string): Promise<CitizenIdProtection> {
-  const master = await crypto.subtle.importKey(
-    'raw',
-    decodeKeyMaterial(keyMaterial),
-    'HKDF',
-    false,
-    ['deriveBits'],
-  );
+  const master = await importMaster(keyMaterial);
 
   const [aesBits, hmacBits] = await Promise.all([
     deriveBits(master, AES_INFO),

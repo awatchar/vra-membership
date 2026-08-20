@@ -22,6 +22,7 @@ const testEnv = env as unknown as { TEST_MIGRATIONS: D1Migration[] };
 
 /** Child tables first: `delete` respects foreign keys when they are enforced. */
 const TABLES_IN_DELETION_ORDER = [
+  'rate_limits',
   'application_events',
   'emails',
   'receipts',

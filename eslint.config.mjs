@@ -77,7 +77,7 @@ export default tseslint.config(
   },
   {
     // Mock adapters satisfy async provider interfaces without awaiting.
-    files: ['src/worker/providers/mock/**/*.ts'],
+    files: ['src/worker/providers/mock/**/*.ts', 'src/worker/security/turnstile.ts'],
     rules: { '@typescript-eslint/require-await': 'off' },
   },
   {
