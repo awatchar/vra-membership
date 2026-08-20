@@ -1,0 +1,46 @@
+name: Engineering task
+description: Define a scoped chore, documentation, test, refactor, or infrastructure task for a human or AI agent.
+title: "[Task] "
+labels:
+  - "type:chore"
+body:
+  - type: input
+    id: links
+    attributes:
+      label: Parent / dependency Issues
+      placeholder: "Refs #1"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: "- [ ] Observable result"
+    validations:
+      required: true
+  - type: input
+    id: paths
+    attributes:
+      label: Intended path ownership
+      placeholder: ".github/**, docs/**"
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Security, privacy, migration, and deployment risk
+      description: Say “None” with a reason if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Verification plan
+    validations:
+      required: true

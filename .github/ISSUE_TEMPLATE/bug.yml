@@ -1,0 +1,51 @@
+name: Bug report
+description: Report reproducible incorrect behavior using synthetic or redacted data.
+title: "[Bug] "
+labels:
+  - "type:bug"
+body:
+  - type: markdown
+    attributes:
+      value: Never attach secrets, real member data, ID-card images, payment slips, or raw production responses. Use private vulnerability reporting for security issues.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction with synthetic data
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Security / privacy / payment impact
+      options:
+        - None known
+        - Possible impact — details are redacted below
+        - Confirmed impact — reported privately
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence and environment
+      description: Include commit SHA, environment, browser/runtime, and sanitized logs.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Proposed regression test
+    validations:
+      required: true
