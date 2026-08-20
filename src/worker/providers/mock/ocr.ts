@@ -8,7 +8,9 @@ import type { ImagePayload, OcrProvider, OcrResult, ThaiIdCardData } from '../ty
  */
 
 export const MOCK_ID_CARD: ThaiIdCardData = {
-  citizenId: '1234567890123',
+  // Sequential pattern that also satisfies the mod-11 check digit, so it
+  // passes validation while being obviously synthetic.
+  citizenId: '1234567890121',
   titleTh: 'นาย',
   firstNameTh: 'ทดสอบ',
   lastNameTh: 'ระบบสมัคร',

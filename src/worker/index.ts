@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppContext } from './context';
+import { createRepository } from './db';
 import { ConfigurationError, readConfig } from './env';
 import { ApiError, errorBody, statusForErrorCode } from './lib/http';
 import { createLogger } from './lib/logger';
@@ -41,6 +42,7 @@ app.use('*', async (c, next) => {
     }),
   );
   c.set('providers', createProviders(c.env));
+  c.set('db', createRepository(c.env.DB));
 
   const startedAt = Date.now();
   await next();

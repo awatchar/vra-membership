@@ -1,3 +1,4 @@
+import type { Repository } from './db';
 import type { Logger } from './lib/logger';
 import type { WorkerConfig, WorkerEnv } from './env';
 import type { Providers } from './providers';
@@ -10,5 +11,6 @@ export interface AppContext {
     config: WorkerConfig;
     logger: Logger;
     providers: Providers;
+    db: Repository;
   };
 }
