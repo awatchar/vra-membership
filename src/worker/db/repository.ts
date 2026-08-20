@@ -291,16 +291,17 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
         db
           .prepare(
             `insert into applications (
-               id, citizen_id_hash, citizen_id_ciphertext,
+               id, citizen_id_hash, citizen_id_ciphertext, access_token_hash,
                title, first_name, last_name, first_name_en, last_name_en,
                birth_date, card_expiry_date,
                status, created_at, updated_at
-             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)`,
+             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)`,
           )
           .bind(
             id,
             input.citizenIdHash,
             input.citizenIdCiphertext,
+            input.accessTokenHash ?? null,
             input.title ?? null,
             input.firstName ?? null,
             input.lastName ?? null,

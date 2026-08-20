@@ -37,6 +37,9 @@ src/worker/            Cloudflare Worker (Hono)
   services/            business rules; no SQL, no HTTP
     state-machine.ts   validated, idempotent, concurrency-safe transitions
     numbering.ts       application and receipt numbers
+    application.ts     application lifecycle up to payment
+    application-access.ts  applicant capability tokens
+    membership.ts      the two plans and their prices
     audit.ts           audit trail with an allowlist for metadata
     member-photo.ts    the only image the system keeps
   lib/logger.ts        allowlist logger; the only sanctioned console sink
@@ -166,6 +169,19 @@ Admin endpoint ที่เปลี่ยนสถานะเพิ่มอ�
 การครอบตัดและ re-encode ทำที่ browser ส่วน Worker เป็นฝ่าย **ตรวจ** ไม่ใช่เชื่อ: อ่านขนาดพิกเซลจาก container header (ไม่ต้องมี decoder) ตรวจสัดส่วน 3:4 และลบ metadata segment ทิ้ง Worker ไม่มี canvas และการใส่ WASM decoder จะเพิ่ม bundle size กับ CPU ทุก upload โดยไม่คุ้มที่ปริมาณ 1-2 ใบสมัครต่อวัน
 
 รับเฉพาะ JPEG สำหรับรูปที่เก็บ เพราะ metadata ของ PNG และ WebP อยู่ใน chunk ที่โมดูลนี้ไม่ได้เขียนใหม่ การรับไว้จะเท่ากับเก็บ chunk ที่อาจมี EXIF หรือข้อความติดมา
+
+## Applicant access
+
+ผู้สมัครไม่มี account ไม่มี password และไม่มีการ login ตามเจตนาของ Issue #1 — กรอกฟอร์มครั้งเดียวแล้วไม่กลับมาอีก
+
+แต่ application id เป็น UUID ที่ปรากฏใน URL และในหน้า confirmation จึงไม่ใช่ความลับ ถ้า id เพียงอย่างเดียวอ่านใบสมัครได้ ใครที่เห็น id — จาก browser history, screenshot, หรือ support ticket — จะอ่านเลขบัตร ที่อยู่ และเบอร์โทรของคนนั้นได้ ภัยคุกคามที่แท้จริงไม่ใช่การเดา id แต่เป็นการเห็นโดยบังเอิญ
+
+ผู้สมัครจึงได้ **capability token**: ค่าสุ่ม 32 bytes ที่ออกให้ครั้งเดียวตอนสร้างใบสมัคร และต้องแนบมากับทุก request หลังจากนั้น
+
+- เก็บเฉพาะ **keyed hash** ของ token ด้วยเหตุผลเดียวกับที่เลขบัตรเก็บเป็น ciphertext: สำเนาของ database ต้องไม่มอบ credential ที่ใช้งานได้
+- **ไม่มีทางขอ token ใหม่** โดยเจตนา ช่องทาง "ส่ง token ให้ฉันอีกครั้ง" จะกลายเป็นวิธียึดใบสมัครด้วยการรู้ email
+- token ที่ผิด token ที่ขาด และใบสมัครที่ไม่มีอยู่ ให้คำตอบเหมือนกันทุกไบต์ (ยกเว้น `requestId`) การตอบต่างกันจะทำให้ผู้เรียกยืนยันได้ว่า id ใดมีอยู่จริง
+- แถวที่ไม่มี hash เก็บไว้ อ่านไม่ได้เลย ซึ่งเป็นโหมดล้มเหลวที่ถูกต้อง
 
 ## Decision records
 
