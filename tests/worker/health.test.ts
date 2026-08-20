@@ -60,7 +60,7 @@ describe('request correlation id', () => {
       }),
     );
 
-    const body = (await response.json()) as { requestId: string };
+    const body: { requestId: string } = await response.json();
     expect(body.requestId).not.toContain('injection');
     expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);
   });
