@@ -15,8 +15,10 @@ coverage/
 *.pem
 *.key
 
-# Local provider credentials and reference material
-api/**/apiendpoint-apikey.md
+# Local provider credentials and reference material.
+# The whole directory stays out of Git: it holds vendor credentials and guides
+# that must never be committed (see AGENTS.md).
+api/
 
 # Editors and operating systems
 .DS_Store

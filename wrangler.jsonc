@@ -1,0 +1,78 @@
+/**
+ * Wrangler configuration for the VRA membership Worker.
+ *
+ * Rules:
+ * - This file is committed. It must never contain secrets, API keys, encryption
+ *   keys, bank account details, or any personal data.
+ * - Secrets live in Cloudflare Secrets (`wrangler secret put <NAME>`) and, for
+ *   local development, in the git-ignored `.dev.vars` file. See `.env.example`.
+ * - Resource identifiers below are placeholders until the Cloudflare account
+ *   owner provisions the real D1 database and R2 buckets. See docs/deployment.md.
+ */
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "vra-membership",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "PROVIDER_MODE": "mock",
+    "APP_BASE_URL": "http://localhost:8787"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vra-membership-dev",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEMBER_PHOTOS",
+      "bucket_name": "vra-member-private-dev"
+    }
+  ],
+  "env": {
+    "production": {
+      "name": "vra-membership",
+      "routes": [
+        {
+          "pattern": "member.vra.or.th",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "production",
+        "PROVIDER_MODE": "live",
+        "APP_BASE_URL": "https://member.vra.or.th"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "vra-membership-prod",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEMBER_PHOTOS",
+          "bucket_name": "vra-member-private"
+        }
+      ]
+    }
+  }
+}

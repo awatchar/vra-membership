@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": ["@cloudflare/vitest-pool-workers/types"],
+    "outDir": "./dist/types/worker",
+    "tsBuildInfoFile": "./dist/types/worker/.tsbuildinfo"
+  },
+  "include": [
+    "src/worker/**/*.ts",
+    "src/shared/**/*.ts",
+    "tests/**/*.ts",
+    "worker-configuration.d.ts"
+  ]
+}
