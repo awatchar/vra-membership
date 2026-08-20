@@ -34,7 +34,7 @@ function paymentInput(applicationId: string): PaymentInput {
     amountSatang: ANNUAL_SATANG,
     sendingBank: null,
     receivingBank: null,
-    receiverAccountTail: null,
+    receiverAccountDigits: null,
     transactionAt: null,
     receiverMatched: true,
     amountMatched: true,

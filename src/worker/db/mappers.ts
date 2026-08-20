@@ -139,7 +139,7 @@ export function toPaymentRecord(row: Row): PaymentRecord {
     amountSatang: requiredInteger(row, 'amount'),
     sendingBank: text(row, 'sending_bank'),
     receivingBank: text(row, 'receiving_bank'),
-    receiverAccountTail: text(row, 'receiver_account_tail'),
+    receiverAccountDigits: text(row, 'receiver_account_tail'),
     transactionAt: text(row, 'transaction_at'),
     receiverMatched: boolean(row, 'receiver_matched'),
     amountMatched: boolean(row, 'amount_matched'),

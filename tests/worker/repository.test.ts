@@ -21,7 +21,7 @@ function paymentInput(applicationId: string, overrides: Partial<PaymentInput> = 
     amountSatang: ANNUAL_SATANG,
     sendingBank: 'BBL',
     receivingBank: 'KBANK',
-    receiverAccountTail: '1234',
+    receiverAccountDigits: '1234',
     transactionAt: '2026-01-02T03:04:05.000Z',
     receiverMatched: true,
     amountMatched: true,
