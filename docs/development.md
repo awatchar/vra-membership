@@ -97,10 +97,13 @@ Worker ต้อง log ผ่าน `src/worker/lib/logger.ts` เท่าน�
 
 ## Repository baseline
 
-รันก่อน commit และก่อนเปิด PR
+**รันหลัง `git add` เสมอ** เพราะสคริปต์ตรวจเฉพาะไฟล์ที่ Git track อยู่ (`git ls-files`) ไฟล์ใหม่ที่ยังไม่ stage จะไม่ถูกตรวจเลย และจะไปพังใน CI แทน
 
 ```powershell
+git add -A
 pwsh -NoLogo -NoProfile -File ./scripts/validate-repository.ps1
 ```
+
+จำนวนไฟล์ที่สคริปต์รายงานเป็นตัวบอกว่าตรวจครบหรือไม่ ถ้าเพิ่มไฟล์ใหม่แล้วตัวเลขไม่ขึ้น แปลว่ายังไม่ stage
 
 บน Windows ที่มีเฉพาะ Windows PowerShell ใช้ `powershell -NoLogo -NoProfile -File .\scripts\validate-repository.ps1` ได้เช่นกัน

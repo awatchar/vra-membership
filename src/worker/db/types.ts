@@ -71,6 +71,8 @@ export interface ApplicationRecord {
   managerAcknowledgedAt: string | null;
   nbtcRecordedAt: string | null;
   nbtcRecordedBy: string | null;
+  /** Keyed hash of the applicant's capability token; null means unreadable. */
+  accessTokenHash: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +81,8 @@ export interface ApplicationRecord {
 export interface ApplicationIdentityInput {
   citizenIdHash: string;
   citizenIdCiphertext: string;
+  /** Set at creation only; there is no path to change it afterwards. */
+  accessTokenHash?: string;
   title?: string | null;
   firstName?: string | null;
   lastName?: string | null;

@@ -24,6 +24,9 @@ export default defineConfig(async () => {
             ENVIRONMENT: 'development',
             PROVIDER_MODE: 'mock',
             APP_BASE_URL: 'http://localhost:8787',
+            // Test-only key material. Endpoints that protect the citizen ID or
+            // issue a capability token derive both from this secret.
+            PII_ENCRYPTION_KEY: 'test-only-pii-encryption-key-material-0123456789',
             TEST_MIGRATIONS: migrations,
           },
         },

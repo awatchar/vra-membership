@@ -103,6 +103,7 @@ export function toApplicationRecord(row: Row): ApplicationRecord {
     managerAcknowledgedAt: text(row, 'manager_acknowledged_at'),
     nbtcRecordedAt: text(row, 'nbtc_recorded_at'),
     nbtcRecordedBy: text(row, 'nbtc_recorded_by'),
+    accessTokenHash: text(row, 'access_token_hash'),
     createdAt: requiredText(row, 'created_at'),
     updatedAt: requiredText(row, 'updated_at'),
   };

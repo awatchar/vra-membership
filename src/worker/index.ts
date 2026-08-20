@@ -8,6 +8,7 @@ import { createLogger } from './lib/logger';
 import { ProviderNotConfiguredError, createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
 import { healthRoutes } from './routes/health';
+import { applicationRoutes } from './routes/applications';
 import { memberPhotoRoutes } from './routes/member-photo';
 import { OcrFailedError, ocrRoutes } from './routes/ocr';
 
@@ -63,6 +64,7 @@ app.use('*', async (c, next) => {
 app.route('/api', healthRoutes);
 app.route('/api', ocrRoutes);
 app.route('/api', memberPhotoRoutes);
+app.route('/api', applicationRoutes);
 
 /** API 404s must be JSON so the SPA fallback never masks a routing mistake. */
 app.notFound((c) => {

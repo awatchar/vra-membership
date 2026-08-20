@@ -52,7 +52,18 @@ $textExtensions = @(
   '.cjs', '.css', '.html', '.js', '.json', '.jsonc', '.jsx', '.md',
   '.mjs', '.ps1', '.sh', '.sql', '.ts', '.tsx', '.txt', '.yaml', '.yml'
 )
-$secretAssignmentPattern = '(?i)(api[_-]?key|access[_-]?token|client[_-]?secret|private[_-]?key|webhook[_-]?secret)\s*[:=]\s*["'']?[A-Za-z0-9_+/=-]{16,}'
+# Looks for a secret-shaped name assigned a secret-shaped literal.
+#
+# The value must contain a digit or one of + / = somewhere in its first run of
+# secret-like characters. Without that condition the pattern also matched
+# ordinary code such as `const accessToken = generateAccessToken()`, where the
+# right-hand side is an identifier rather than a literal. Real keys and tokens
+# are not made of letters alone, so requiring one non-letter keeps the check
+# useful while dropping that class of false positive.
+#
+# This is defence in depth, not the only line: GitHub secret scanning and push
+# protection are both enabled on this repository.
+$secretAssignmentPattern = '(?i)(api[_-]?key|access[_-]?token|client[_-]?secret|private[_-]?key|webhook[_-]?secret)\s*[:=]\s*["'']?(?=[A-Za-z0-9_+/=-]{16,})[A-Za-z0-9_-]*[0-9+/=]'
 
 foreach ($path in $trackedFiles) {
   $extension = [System.IO.Path]::GetExtension($path).ToLowerInvariant()
