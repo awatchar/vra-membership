@@ -276,6 +276,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async setPhoto(id, photo) {
+      const timestamp = isoNow(now);
       await run(
         db
           .prepare(
@@ -283,7 +284,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
                updated_at = ?
              where id = ?`,
           )
-          .bind(photo.key, photo.source, photo.uploadedAt ?? isoNow(now), isoNow(now), id),
+          .bind(photo.key, photo.source, photo.uploadedAt ?? timestamp, timestamp, id),
       );
     },
 
@@ -334,6 +335,13 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async list(query = {}) {
+      // An explicitly empty filter means "no status matches". Treating it as
+      // "no filter" would turn an admin UI that computed an empty filter set
+      // into a full-table dump of personal data.
+      if (query.statuses !== undefined && query.statuses.length === 0) {
+        return [];
+      }
+
       const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAXIMUM_LIST_LIMIT);
       const offset = Math.max(query.offset ?? 0, 0);
       const statuses = query.statuses ?? [];
@@ -575,13 +583,14 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async markSent(id, providerEmailId, sentAt) {
+      const timestamp = isoNow(now);
       await run(
         db
           .prepare(
             `update emails set status = 'SENT', provider_email_id = ?, sent_at = ?, updated_at = ?
              where id = ?`,
           )
-          .bind(providerEmailId, sentAt ?? isoNow(now), isoNow(now), id),
+          .bind(providerEmailId, sentAt ?? timestamp, timestamp, id),
       );
     },
 
@@ -594,6 +603,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async markDelivered(id, deliveredAt) {
+      const timestamp = isoNow(now);
       await run(
         db
           .prepare(
@@ -603,7 +613,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
                updated_at = ?
              where id = ?`,
           )
-          .bind(deliveredAt ?? isoNow(now), isoNow(now), id),
+          .bind(deliveredAt ?? timestamp, timestamp, id),
       );
     },
 
@@ -618,25 +628,27 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     async recordFirstOpen(id, openedAt) {
       // `where first_opened_at is null` makes a replayed webhook a no-op, which
       // is what keeps the processing email from being sent more than once.
+      const timestamp = isoNow(now);
       const result = await run(
         db
           .prepare(
             `update emails set first_opened_at = ?, updated_at = ?
              where id = ? and first_opened_at is null`,
           )
-          .bind(openedAt ?? isoNow(now), isoNow(now), id),
+          .bind(openedAt ?? timestamp, timestamp, id),
       );
       return result.meta.changes > 0;
     },
 
     async recordFirstClick(id, clickedAt) {
+      const timestamp = isoNow(now);
       const result = await run(
         db
           .prepare(
             `update emails set first_clicked_at = ?, updated_at = ?
              where id = ? and first_clicked_at is null`,
           )
-          .bind(clickedAt ?? isoNow(now), isoNow(now), id),
+          .bind(clickedAt ?? timestamp, timestamp, id),
       );
       return result.meta.changes > 0;
     },

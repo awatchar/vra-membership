@@ -721,3 +721,36 @@ describe('audit events', () => {
     ).resolves.toBe(true);
   });
 });
+
+describe('list filtering guards', () => {
+  it('treats an explicitly empty status filter as matching nothing', async () => {
+    const repo = repository();
+    await seedApplication(repo);
+
+    // An admin UI that computed an empty filter set must not receive the whole
+    // table of personal data.
+    await expect(repo.applications.list({ statuses: [] })).resolves.toEqual([]);
+    await expect(repo.applications.list()).resolves.toHaveLength(1);
+  });
+});
+
+describe('timestamp consistency', () => {
+  it('uses one timestamp per write so paired columns cannot disagree', async () => {
+    let calls = 0;
+    const repo = repository({
+      now: () => {
+        calls += 1;
+        return new Date(Date.UTC(2026, 0, 1, 0, 0, calls));
+      },
+    });
+    const id = await seedApplication(repo);
+
+    await repo.applications.setPhoto(id, {
+      key: `member-photos/${crypto.randomUUID()}.jpg`,
+      source: 'UPLOAD',
+    });
+
+    const application = await repo.applications.findById(id);
+    expect(application!.photoUploadedAt).toBe(application!.updatedAt);
+  });
+});

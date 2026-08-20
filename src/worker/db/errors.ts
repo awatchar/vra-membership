@@ -2,9 +2,13 @@
  * Database error translation.
  *
  * D1 surfaces constraint violations as opaque messages. Translating them here
- * keeps the rest of the application free of string matching, and keeps the
- * original message - which can contain the offending value - out of the error
- * that travels up the stack.
+ * keeps the rest of the application free of string matching.
+ *
+ * For unique violations the driver message is dropped entirely and only the
+ * constraint name is carried forward, because that message quotes the value
+ * that collided. Other failures are rethrown unchanged: their messages name a
+ * table or a constraint, not a value, and they are only ever surfaced as an
+ * error code by the top-level handler, never logged or returned to a client.
  */
 
 export class UniqueConstraintError extends Error {

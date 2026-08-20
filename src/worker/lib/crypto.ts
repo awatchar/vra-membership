@@ -60,33 +60,26 @@ function fromBase64Url(value: string): Uint8Array {
 }
 
 /**
- * Accepts either base64 or raw text key material. Requiring at least 32 bytes
- * of decoded material keeps a short, guessable key from being accepted.
+ * Uses the secret's own UTF-8 bytes as HKDF input.
+ *
+ * Deliberately not "base64 if it decodes, text otherwise": that branch means a
+ * plain-text key that happens to be valid base64 derives different subkeys from
+ * the same string, which is exactly the kind of ambiguity that turns a key
+ * rotation into unrecoverable ciphertext. The operator is told to generate the
+ * secret with `openssl rand -base64 48` (see docs/deployment.md); HKDF accepts
+ * input of any length, so no decoding step is needed.
  */
 function decodeKeyMaterial(keyMaterial: string): Uint8Array {
   if (keyMaterial.length === 0) {
     throw new CryptoError('PII encryption key is empty');
   }
 
-  let bytes: Uint8Array;
-  try {
-    bytes = fromBase64Url(keyMaterial);
-  } catch {
-    bytes = new TextEncoder().encode(keyMaterial);
-  }
-
+  const bytes = new TextEncoder().encode(keyMaterial);
   if (bytes.byteLength < MINIMUM_KEY_BYTES) {
-    // Fall back to the raw bytes in case the value was not base64 at all but
-    // still decoded to something short.
-    const raw = new TextEncoder().encode(keyMaterial);
-    if (raw.byteLength < MINIMUM_KEY_BYTES) {
-      throw new CryptoError(
-        `PII encryption key must provide at least ${MINIMUM_KEY_BYTES} bytes of material`,
-      );
-    }
-    return raw;
+    throw new CryptoError(
+      `PII encryption key must provide at least ${MINIMUM_KEY_BYTES} bytes of material`,
+    );
   }
-
   return bytes;
 }
 
