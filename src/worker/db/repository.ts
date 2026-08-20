@@ -803,11 +803,16 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async listByApplicationId(applicationId) {
+      // `rowid` breaks ties, not `id`. Events written in the same batch share a
+      // millisecond, and `id` is a random UUID, so ordering by it would shuffle
+      // the timeline the admin screen shows - putting STATUS_CHANGED before the
+      // domain event that caused it. `rowid` follows insert order, which is the
+      // causal order.
       const rows = await all(
         db
           .prepare(
             `select * from application_events where application_id = ?
-             order by created_at asc, id asc`,
+             order by created_at asc, rowid asc`,
           )
           .bind(applicationId),
       );

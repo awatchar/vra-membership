@@ -260,9 +260,38 @@ describe('audit trail', () => {
 
     await stateMachine.transition(id, 'PAYMENT_VERIFIED', { domainEvent: 'PAYMENT_VERIFIED' });
 
+    // Asserted as an exact sequence rather than with index arithmetic: both
+    // events of one transition share a millisecond, so this is precisely the
+    // case where a non-deterministic tiebreak would show up.
     const events = await repo.events.listByApplicationId(id);
-    const types = events.map((event) => event.eventType);
-    expect(types.indexOf('PAYMENT_VERIFIED')).toBeLessThan(types.lastIndexOf('STATUS_CHANGED'));
+    expect(events.map((event) => event.eventType)).toEqual([
+      'STATUS_CHANGED',
+      'PAYMENT_VERIFIED',
+      'STATUS_CHANGED',
+    ]);
+  });
+
+  it('keeps the timeline in causal order when a batch shares a millisecond', async () => {
+    // The clock is frozen, so every event carries the same created_at and the
+    // ordering can only come from insert order.
+    const frozen = new Date('2026-08-20T03:00:00.000Z');
+    const repo = repository({ now: () => frozen });
+    const id = await seedApplication(repo);
+    const stateMachine = createStateMachine(repo);
+
+    await stateMachine.transition(id, 'AWAITING_PAYMENT');
+    await stateMachine.transition(id, 'PAYMENT_VERIFIED', { domainEvent: 'PAYMENT_VERIFIED' });
+    await stateMachine.transition(id, 'SUBMITTED', { domainEvent: 'APPLICATION_SUBMITTED' });
+
+    const events = await repo.events.listByApplicationId(id);
+    expect(new Set(events.map((event) => event.createdAt)).size).toBe(1);
+    expect(events.map((event) => event.eventType)).toEqual([
+      'STATUS_CHANGED',
+      'PAYMENT_VERIFIED',
+      'STATUS_CHANGED',
+      'APPLICATION_SUBMITTED',
+      'STATUS_CHANGED',
+    ]);
   });
 
   it('records the true previous status, never a stale one', async () => {
