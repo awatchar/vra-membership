@@ -1,6 +1,7 @@
 import { requireSecret } from '../env';
 import type { WorkerEnv } from '../env';
 import { createIappOcrProvider } from './iapp';
+import { createSlipOkProvider } from './slipok';
 import { createMockEmailProvider } from './mock/email';
 import { createMockOcrProvider } from './mock/ocr';
 import { createMockSlipProvider } from './mock/slip';
@@ -43,8 +44,11 @@ export function createProviders(env: WorkerEnv): Providers {
     get ocr() {
       return createIappOcrProvider({ apiKey: requireSecret(env, 'IAPP_API_KEY') });
     },
-    get slip(): never {
-      throw new ProviderNotConfiguredError('slipok');
+    get slip() {
+      return createSlipOkProvider({
+        apiKey: requireSecret(env, 'SLIPOK_API_KEY'),
+        branchId: requireSecret(env, 'SLIPOK_BRANCH_ID'),
+      });
     },
     get email(): never {
       throw new ProviderNotConfiguredError('resend');

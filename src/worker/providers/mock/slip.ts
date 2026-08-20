@@ -12,7 +12,7 @@ export const MOCK_TRANSACTION: SlipTransaction = {
   amount: 500,
   sendingBank: 'BBL',
   receivingBank: 'KBANK',
-  receiverAccountTail: '1234',
+  receiverAccountDigits: '1234',
   receiverName: 'สมาคมนักวิทยุอาสาสมัคร (ตัวอย่าง)',
   transactionAt: '2026-01-02T03:04:05.000Z',
 };

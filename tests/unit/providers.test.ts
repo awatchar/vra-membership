@@ -60,10 +60,25 @@ describe('createProviders', () => {
     expect(providers.ocr.name).toBe('iapp-ocr');
   });
 
-  it('still reports slip and email as not implemented', () => {
+  it('builds the live slip adapter once both of its secrets are present', () => {
+    const providers = createProviders(
+      fakeEnv('live', { SLIPOK_API_KEY: 'test-only-key', SLIPOK_BRANCH_ID: '12345' }),
+    );
+
+    expect(providers.slip.name).toBe('slipok');
+  });
+
+  it('reports which slip secret is missing', () => {
+    const providers = createProviders(fakeEnv('live', { SLIPOK_API_KEY: 'test-only-key' }));
+
+    // The branch id forms part of the endpoint path, so a missing one cannot be
+    // defaulted.
+    expect(() => providers.slip).toThrow(/SLIPOK_BRANCH_ID/);
+  });
+
+  it('still reports email as not implemented', () => {
     const providers = createProviders(fakeEnv('live', { IAPP_API_KEY: 'test-only-key' }));
 
-    expect(() => providers.slip).toThrow(ProviderNotConfiguredError);
     expect(() => providers.email).toThrow(ProviderNotConfiguredError);
   });
 });

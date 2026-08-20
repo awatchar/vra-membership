@@ -573,7 +573,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
             input.amountSatang,
             input.sendingBank,
             input.receivingBank,
-            input.receiverAccountTail,
+            input.receiverAccountDigits,
             input.transactionAt,
             bool(input.receiverMatched),
             bool(input.amountMatched),

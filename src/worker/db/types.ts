@@ -127,7 +127,7 @@ export interface PaymentRecord {
   amountSatang: number;
   sendingBank: string | null;
   receivingBank: string | null;
-  receiverAccountTail: string | null;
+  receiverAccountDigits: string | null;
   transactionAt: string | null;
   receiverMatched: boolean;
   amountMatched: boolean;

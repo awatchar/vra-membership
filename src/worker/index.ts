@@ -7,10 +7,12 @@ import { ApiError, errorBody, statusForErrorCode } from './lib/http';
 import { createLogger } from './lib/logger';
 import { ProviderNotConfiguredError, createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
+import { PaymentRejectedError } from './services/payment';
 import { healthRoutes } from './routes/health';
 import { applicationRoutes } from './routes/applications';
 import { memberPhotoRoutes } from './routes/member-photo';
 import { OcrFailedError, ocrRoutes } from './routes/ocr';
+import { paymentRoutes } from './routes/payment';
 
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
 const PROVIDER_ERROR_MESSAGE = 'ไม่สามารถเชื่อมต่อบริการภายนอกได้ กรุณาลองใหม่อีกครั้ง';
@@ -65,6 +67,7 @@ app.route('/api', healthRoutes);
 app.route('/api', ocrRoutes);
 app.route('/api', memberPhotoRoutes);
 app.route('/api', applicationRoutes);
+app.route('/api', paymentRoutes);
 
 /** API 404s must be JSON so the SPA fallback never masks a routing mistake. */
 app.notFound((c) => {
@@ -83,6 +86,21 @@ app.onError((error, c) => {
     // `validationErrorBody` carries only the paths.
     logger.warn({ event: 'request.failed', errorCode: error.code, count: error.fields.length });
     return c.json(validationErrorBody(error, requestId), 422);
+  }
+
+  if (error instanceof PaymentRejectedError) {
+    logger.warn({ event: 'payment.rejected', errorCode: error.code, reason: error.reason });
+    return c.json(
+      {
+        error: {
+          code: error.code,
+          reason: error.reason,
+          message: error.publicMessage,
+          ...(requestId ? { requestId } : {}),
+        },
+      },
+      statusForErrorCode(error.code) as ContentfulStatusCode,
+    );
   }
 
   if (error instanceof OcrFailedError) {

@@ -42,6 +42,7 @@ src/worker/            Cloudflare Worker (Hono)
     membership.ts      the two plans and their prices
     audit.ts           audit trail with an allowlist for metadata
     member-photo.ts    the only image the system keeps
+    payment.ts         the five checks that accept a payment
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
@@ -49,8 +50,10 @@ src/worker/            Cloudflare Worker (Hono)
   lib/citizen-id.ts    citizen ID normalisation and check-digit validation
   lib/files.ts         magic-byte sniffing and size-limited body reads
   lib/images.ts        dimension reading and JPEG metadata stripping
+  lib/promptpay.ts     Thai QR Payment payload with an exact amount
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/iapp/      Thai national ID OCR adapter; narrows the response
+  providers/slipok/    payment slip verification adapter
   providers/mock/      deterministic adapters used by development and tests
 src/web/               React client, built to dist/client
 migrations/            append-only D1 migrations
@@ -182,6 +185,22 @@ Admin endpoint ที่เปลี่ยนสถานะเพิ่มอ�
 - **ไม่มีทางขอ token ใหม่** โดยเจตนา ช่องทาง "ส่ง token ให้ฉันอีกครั้ง" จะกลายเป็นวิธียึดใบสมัครด้วยการรู้ email
 - token ที่ผิด token ที่ขาด และใบสมัครที่ไม่มีอยู่ ให้คำตอบเหมือนกันทุกไบต์ (ยกเว้น `requestId`) การตอบต่างกันจะทำให้ผู้เรียกยืนยันได้ว่า id ใดมีอยู่จริง
 - แถวที่ไม่มี hash เก็บไว้ อ่านไม่ได้เลย ซึ่งเป็นโหมดล้มเหลวที่ถูกต้อง
+
+## Payment
+
+ห้าข้อต้องเป็นจริงก่อนสมาคมจะยอมรับว่าได้รับเงิน และทุกข้อตรวจในระบบเราเอง ไม่ใช่เชื่อคำตอบของ provider
+
+1. **รายการมีอยู่จริง** ในระบบธนาคาร
+2. **เงินเข้าบัญชีสมาคม** ธนาคารปิดบังเลขบัญชีไว้บางส่วน จึงตรวจว่าเลขที่มองเห็นเรียงอยู่ในเลขบัญชีที่ตั้งค่าไว้ ถ้าเห็นน้อยกว่า 4 หลักถือว่า **ยืนยันไม่ได้** ไม่ใช่ผ่าน เพราะการอนุมัติเงินโดยไม่รู้ว่าเงินไปไหนเป็นการล้มเหลวผิดทาง
+3. **ยอดตรงกับประเภทสมาชิก** ที่ resolve จาก server ยอดจาก client ไม่มี code path ไปถึงการเปรียบเทียบนี้เลย
+4. **สลิปยังไม่เคยถูกใช้** ตัดสินด้วย `UNIQUE(transaction_ref)` ไม่ใช่การอ่านก่อนเขียน และส่ง `log: true` ให้ SlipOK บันทึกไว้ตรวจซ้ำอีกชั้น
+5. **เวลาโอนสมเหตุสมผล** ไม่เก่ากว่า 7 วัน และไม่อยู่ในอนาคตเกิน 15 นาที (เผื่อนาฬิกาคลาด)
+
+ก่อนทำทั้งห้าข้อ ระบบตรวจว่าใบสมัครอยู่สถานะ `AWAITING_PAYMENT` จริง — state machine ถือว่าการ transition ซ้ำเข้า `PAYMENT_VERIFIED` เป็น no-op ซึ่งถูกต้องโดยทั่วไป แต่ในบริบทนี้หมายความว่า "ใบสมัครนี้จ่ายแล้ว" การรับสลิปที่สองจะบันทึกการชำระเงินซ้ำและแจ้งผู้สมัครว่าสำเร็จ การตรวจก่อนยังประหยัดค่าเรียก provider ที่คิดเงินต่อครั้งด้วย
+
+จำนวนเงินเป็นจำนวนเต็มหน่วยสตางค์ทุกจุด ยอดจาก SlipOK ถูกปัดเป็นสตางค์ที่ขอบระบบ เพื่อให้การเปรียบเทียบทุกครั้งเป็นการเทียบจำนวนเต็ม
+
+รูปสลิปไม่ถูกเก็บ และในเส้นทางหลักมันไม่ถึง Worker เลย: browser อ่าน QR แล้วส่งเฉพาะ payload (Issue #1 หัวข้อ 18)
 
 ## Decision records
 

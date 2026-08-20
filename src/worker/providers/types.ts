@@ -76,7 +76,12 @@ export interface SlipTransaction {
   amount: number;
   sendingBank: string | null;
   receivingBank: string | null;
-  receiverAccountTail: string | null;
+  /**
+   * Digits the provider left visible for the receiver account. Banks mask
+   * most of the number, so this is a partial value and matching has to account
+   * for that.
+   */
+  receiverAccountDigits: string | null;
   receiverName: string | null;
   /** ISO 8601 instant of the transfer as reported by the provider. */
   transactionAt: string | null;
