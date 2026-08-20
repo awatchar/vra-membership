@@ -28,7 +28,12 @@ src/worker/            Cloudflare Worker (Hono)
     mappers.ts         row to model conversion
     repository.ts      parameterised queries grouped per aggregate
     errors.ts          constraint-violation translation
+  services/            business rules; no SQL, no HTTP
+    state-machine.ts   validated, idempotent, concurrency-safe transitions
+    numbering.ts       application and receipt numbers
+    audit.ts           audit trail with an allowlist for metadata
   lib/logger.ts        allowlist logger; the only sanctioned console sink
+  lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
   lib/crypto.ts        citizen ID encryption and duplicate-lookup hashing
   lib/citizen-id.ts    citizen ID normalisation and check-digit validation
@@ -72,6 +77,39 @@ Confirmed properties of the schema, enforced by `migrations/0001_create_core_sch
 - Timestamp ทั้งหมดเป็น ISO 8601 UTC และแปลงเป็น Asia/Bangkok เฉพาะตอนแสดงผล
 - `status`, `membership_type`, `photo_source`, email `type`/`status` และ `actor_type` ถูกจำกัดด้วย `CHECK` constraint
 - `metadata_json` ของ audit event รับได้เฉพาะ object แบนที่มีค่าเป็น primitive และถูกกรองอีกครั้งตอนอ่าน
+
+## Application state machine
+
+```text
+DRAFT ──> AWAITING_PAYMENT ──> PAYMENT_VERIFIED ──> SUBMITTED
+  │              │                    │                 │
+  │              │                    │                 ▼
+  │              │                    │           MANAGER_NOTIFIED
+  │              │                    │                 │
+  │              │                    │                 ▼
+  │              │                    │           NBTC_PROCESSING
+  │              │                    │                 │
+  │              │                    │                 ▼
+  │              │                    │            NBTC_RECORDED ──> COMPLETED
+  │              │                    │
+  └──> CANCELLED ┘                    └──> REFUND_REQUIRED ──> REFUNDED
+
+REJECTED reachable from AWAITING_PAYMENT onwards, and leads to REFUND_REQUIRED
+CANCELLED reachable only before a payment exists
+COMPLETED, CANCELLED and REFUNDED are terminal
+```
+
+คุณสมบัติที่บังคับไว้ใน `src/worker/services/state-machine.ts` และมี test ครอบทั้งสามข้อ
+
+- **Validated** transition ที่ไม่อยู่ในตารางถูกปฏิเสธ ไม่มี code path ใดกระโดดข้ามขั้นได้
+- **Idempotent** การขอสถานะที่เป็นอยู่แล้วเป็น no-op ไม่บันทึก audit event ซ้ำ และไม่ทำ side effect ซ้ำ
+- **Concurrency-safe** การเขียนเป็น compare-and-set บนสถานะที่อ่านมาจริง ไม่ใช่บนชุด predecessor ทั้งหมด เพื่อให้ `from` ใน audit event เป็นค่าที่เคยเป็นจริงเสมอ
+
+## Numbering
+
+`VRA-{พ.ศ.}-{running}` และ `VRA-RC-{พ.ศ.}-{running}` โดย prefix และความยาว sequence เป็น config ปี พ.ศ. คำนวณจากเวลา Asia/Bangkok ไม่ใช่จากวัน UTC ใบสมัครที่ส่งเวลา 23:30 UTC ของวันที่ 31 ธันวาคม จึงได้เลขของปีถัดไป
+
+ความไม่ซ้ำเป็นการรับประกันจาก `UNIQUE` constraint ไม่ใช่จาก application layer ระบบเสนอเลขจากค่าสูงสุดที่ออกไปแล้วบวกหนึ่ง แล้วให้ constraint ตัดสิน ผู้แพ้อ่านค่าสูงสุดใหม่และลองอีกครั้ง จึงได้ลำดับที่ไม่ซ้ำและไม่มีเลขขาดหาย
 
 ## Decision records
 

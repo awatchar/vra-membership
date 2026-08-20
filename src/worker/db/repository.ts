@@ -81,6 +81,12 @@ export interface ApplicationRepository {
   /** Assigns the application number. Fails with `UniqueConstraintError` if taken. */
   setReferenceNo(id: string, referenceNo: string): Promise<void>;
   /**
+   * Highest reference number matching a `like` pattern, or null when none
+   * exists. The sequence is zero-padded to a fixed width, so the lexicographic
+   * maximum is also the numeric maximum.
+   */
+  findMaxReferenceNo(pattern: string): Promise<string | null>;
+  /**
    * Compare-and-set on `status`. Returns false when the row was not in `from`,
    * which is how the state machine stays safe under concurrent requests
    * without a transaction.
@@ -118,6 +124,8 @@ export interface ReceiptRepository {
   create(input: ReceiptInput): Promise<ReceiptRecord>;
   findByApplicationId(applicationId: string): Promise<ReceiptRecord | null>;
   findByReceiptNo(receiptNo: string): Promise<ReceiptRecord | null>;
+  /** Highest receipt number matching a `like` pattern, or null when none exists. */
+  findMaxReceiptNo(pattern: string): Promise<string | null>;
   markEmailSent(id: string, sentAt?: string): Promise<void>;
 }
 
@@ -304,6 +312,20 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
         // that has already been printed on a document.
         throw new UniqueConstraintError('applications.reference_no');
       }
+    },
+
+    async findMaxReferenceNo(pattern) {
+      const row = await first(
+        db
+          .prepare(
+            `select reference_no from applications
+             where reference_no like ?
+             order by reference_no desc limit 1`,
+          )
+          .bind(pattern),
+      );
+      const value = row?.['reference_no'];
+      return typeof value === 'string' ? value : null;
     },
 
     async updateStatusIf(id, from, to, timestamps) {
@@ -520,6 +542,20 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
         db.prepare('select * from receipts where receipt_no = ?').bind(receiptNo),
       );
       return row ? toReceiptRecord(row) : null;
+    },
+
+    async findMaxReceiptNo(pattern) {
+      const row = await first(
+        db
+          .prepare(
+            `select receipt_no from receipts
+             where receipt_no like ?
+             order by receipt_no desc limit 1`,
+          )
+          .bind(pattern),
+      );
+      const value = row?.['receipt_no'];
+      return typeof value === 'string' ? value : null;
     },
 
     async markEmailSent(id, sentAt) {
