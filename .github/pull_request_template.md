@@ -13,9 +13,9 @@ Describe the result and why it is needed.
 
 ## Verification
 
-| Command / check | Result |
-| --- | --- |
-| `pwsh -NoLogo -NoProfile -File ./scripts/validate-repository.ps1` | |
+| Command / check                                                   | Result |
+| ----------------------------------------------------------------- | ------ |
+| `pwsh -NoLogo -NoProfile -File ./scripts/validate-repository.ps1` |        |
 
 ## Security and privacy
 

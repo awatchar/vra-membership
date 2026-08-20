@@ -11,3 +11,29 @@ updates:
     labels:
       - dependencies
       - type:chore
+
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - dependencies
+      - type:chore
+    groups:
+      # Keep the toolchain moving in one reviewable PR instead of a dozen.
+      dev-toolchain:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      production-patches:
+        applies-to: version-updates
+        dependency-type: production
+        update-types:
+          - patch

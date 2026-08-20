@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "module": "esnext",
+    "types": ["node"],
+    "outDir": "./dist/types/tools",
+    "tsBuildInfoFile": "./dist/types/tools/.tsbuildinfo"
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}
