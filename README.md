@@ -63,6 +63,7 @@ pwsh -NoLogo -NoProfile -File ./scripts/validate-repository.ps1
 
 ## Documentation
 
+- [สิ่งที่ผู้ดูแลต้องทำ](docs/owner-actions.md) — checklist ของงานที่ต้องมีสิทธิ์ในบัญชี Cloudflare หรือ repository
 - [การพัฒนา](docs/development.md)
 - [สถาปัตยกรรม](docs/architecture.md)
 - [Security และ Privacy](docs/security-privacy.md)
