@@ -16,20 +16,15 @@ Pipeline ประกอบด้วยสาม workflow
 
 ขั้นตอนเหล่านี้ต้องทำโดยผู้ดูแลที่มีสิทธิ์ในบัญชี Cloudflare และ repository ไม่สามารถทำจาก CI ได้
 
-1. สร้าง D1 database สองชุด
+1. ~~สร้าง D1 database สองชุด~~ **เสร็จแล้ว** `vra-membership-dev` และ `vra-membership-prod` ถูกสร้างและ `database_id` อยู่ใน `wrangler.jsonc` แล้ว
+
+2. ~~สร้าง R2 bucket แบบ private สองชุด~~ **เสร็จแล้ว** `vra-member-private-dev` และ `vra-member-private` ถูกสร้างแล้ว ตรวจยืนยันว่า public access ผ่าน `r2.dev` ปิดอยู่และไม่มี custom domain ผูกไว้
+
+   ตรวจซ้ำได้ด้วย
 
    ```bash
-   npx wrangler d1 create vra-membership-dev
-   npx wrangler d1 create vra-membership-prod
-   ```
-
-   นำ `database_id` ที่ได้ไปแทน placeholder `00000000-0000-0000-0000-000000000000` ใน `wrangler.jsonc` (ค่านี้ไม่ใช่ความลับ)
-
-2. สร้าง R2 bucket แบบ private สองชุด และตรวจว่าไม่มี public access หรือ custom domain
-
-   ```bash
-   npx wrangler r2 bucket create vra-member-private-dev
-   npx wrangler r2 bucket create vra-member-private
+   npx wrangler r2 bucket dev-url get vra-member-private
+   npx wrangler r2 bucket domain list vra-member-private
    ```
 
 3. ผูก custom domain `member.vra.or.th` เข้ากับ Worker `vra-membership`
