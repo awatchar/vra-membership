@@ -158,13 +158,19 @@ describe('routing', () => {
     expect(body.error.code).toBe('NOT_FOUND');
   });
 
-  it('serves the client application for a deep admin link', async () => {
-    // This is the shape of URL the manager notification email contains, so the
-    // single-page fallback has to answer it.
+  it('hands a deep admin link to the asset binding rather than answering it', async () => {
+    // This is the shape of URL the manager notification email contains, and the
+    // Worker's job is to delegate it so the single-page fallback resolves.
+    //
+    // Asserting a 200 would be asserting that `dist/client` was built, which is
+    // not what this change controls - and in CI the tests run before the build,
+    // so it would pass only on a machine that happened to have the artifacts.
+    // What is checked instead is that the Worker did not answer it itself.
     const response = await get('/admin/applications/11111111-2222-4333-8444-555555555555');
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/html');
+    expect(response.headers.get('content-type') ?? '').not.toContain('application/json');
+    // The headers are applied to whatever the binding returns, built or not.
+    expect(response.headers.get('content-security-policy')).toBe(CONTENT_SECURITY_POLICY);
   });
 
   it('still serves the API through the Worker', async () => {
