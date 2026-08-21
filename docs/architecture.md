@@ -73,6 +73,15 @@ src/worker/            Cloudflare Worker (Hono)
   providers/mock/      deterministic adapters used by development and tests
 assets/fonts/          Sarabun (OFL), vendored so a receipt never needs the network
 src/web/               React client, built to dist/client
+  App.tsx              the applicant wizard; one lock, no persistence
+  api/client.ts        the only place the browser talks to the API
+  state/wizard.ts      one reducer holding every answer
+  state/validation.ts  Thai messages that say what to do
+  lib/image.ts         downscale and square-crop on a canvas
+  lib/qr.ts            slip QR read in the browser, not uploaded
+  lib/turnstile.ts     the one third-party script, loaded lazily
+  components/          Field, Button, Alert, CropBox, QrCode, StepFrame
+  steps/               one component per wizard step
 migrations/            append-only D1 migrations
 tests/                 Vitest suites, all running inside workerd
 ```
@@ -339,6 +348,44 @@ NBTC_RECORDED → MEMBER_COMPLETION_EMAIL_SENT → COMPLETED
 ```
 
 `COMPLETED` บันทึกเมื่อสมาชิกได้รับแจ้งแล้วเท่านั้น เพราะนั่นคือสิ่งที่สถานะนี้อ้าง ถ้าอีเมลล้ม การบันทึกทะเบียนยังอยู่ (`NBTC_RECORDED`) และการเรียกซ้ำจะทำเฉพาะส่วนที่ยังขาด ตัวตนผู้จัดการถูกเก็บใน `nbtc_recorded_by` และใน audit event — เป็นที่เดียวที่ระบบเก็บตัวตนของเจ้าหน้าที่ และจำเป็น เพราะการบันทึกทะเบียนกับหน่วยงานกำกับต้องระบุได้ว่าใครทำ
+
+## Applicant wizard
+
+เก้าขั้นตอนใน single page เดียว ตั้งแต่ privacy notice ถึงหน้า confirmation คอลัมน์เดียวทุกความกว้าง — layout ที่ใช้ได้บนมือถือ 360px ก็ใช้ได้บน desktop โดยขยายขอบ ไม่ต้อง reflow
+
+**ไม่มีการเก็บอะไรลง client storage เลย** ไม่ `localStorage` ไม่ `sessionStorage` ไม่ IndexedDB state ถือเลขบัตรประชาชน, ภาพบัตร, ภาพใบหน้า, ภาพสลิป และ capability token ที่ป้องกันใบสมัครทั้งใบ storage อยู่นานกว่า tab, ถูกอ่านได้โดย script ใดก็ตามที่เคยรันบน origin นี้ และถูกเขียนลงดิสก์ การ refresh แล้วฟอร์มหายคือราคาที่จ่าย และเป็นราคาที่ถูก (test ยืนยันว่า storage ว่างเปล่าทั้งตอนสำเร็จและตอน error)
+
+ภาพบัตรถูกทิ้งทันทีที่ OCR คืนค่า ไม่ถือไว้ตลอด wizard และผลจาก OCR ถือเป็น **pre-fill ไม่ใช่ผลลัพธ์** — ทุกช่องแก้ได้รวมทั้งเลขบัตร และข้อความบอกให้เทียบกับบัตรตัวจริงทีละช่อง (หัวข้อ 7)
+
+ทางเลือก "กรอกข้อมูลเองแทน" อยู่ตั้งแต่ต้น ไม่ใช่โผล่มาหลัง OCR ล้ม — OCR บนภาพถ่ายบัตรที่สึกล้มบ่อยพอที่การซ่อนทางเลือกไว้จะทำให้ผู้สมัครบางคนติดอยู่ที่ขั้นที่สอง และบัตรประชาชนไม่ใช่เอกสารที่คนอยากถ่ายห้ารอบ
+
+### รูปสมาชิก
+
+ภาพใบหน้าจากบัตรถูก **เสนอ ไม่ใช่ถือว่ายินยอม** เลือกแล้วต้องติ๊ก consent แยกอีกช่อง และปุ่มยืนยันยังกดไม่ได้จนติ๊ก (หัวข้อ 61) การสลับไปอัปโหลดรูปใหม่จะล้าง consent ทิ้ง เพื่อไม่ให้ consent ค้างอยู่กับทางเลือกที่ผู้สมัครยกเลิกไปแล้ว
+
+checklist ยืนยันเป็นสามข้อ ไม่ใช่ข้อเดียว เพราะ "ยืนยันว่ารูปนี้ใช้ได้" คือช่องที่คนติ๊กโดยไม่อ่าน แต่ "เห็นใบหน้าชัด", "ไม่สวมหมวกหรือแว่นกันแดด" และ "ถ่ายไม่นานและเป็นรูปของตัวเอง" คือสามอย่างที่ต้องมองจริง (หัวข้อ 12)
+
+การ crop ทำบน canvas ซึ่งมีผลพลอยได้: output เป็น pixel ที่ encode ใหม่ EXIF และพิกัด GPS จึงไม่รอด — server ก็ strip metadata อยู่แล้ว แต่แบบนี้ข้อมูลไม่ออกจากเครื่องตั้งแต่แรก ตัวควบคุม crop ใช้ได้ด้วยคีย์บอร์ด (ปุ่มลูกศรเลื่อน, slider ย่อขยาย) เพราะเป็นขั้นที่ข้ามไม่ได้
+
+### สลิป
+
+เบราว์เซอร์อ่าน QR เองเป็นทางหลัก และเมื่ออ่านได้ **ภาพไม่ถูกถือไว้ด้วยซ้ำ** ส่งแค่ payload (หัวข้อ 18) `BarcodeDetector` มาก่อนเพราะเป็น decoder ของ platform เองและทนภาพถ่ายได้ดีกว่า jsQR เป็น fallback สำหรับเบราว์เซอร์ที่ยังไม่มี การอัปโหลดภาพเป็น fallback ชั้นสุดท้ายสำหรับสลิปที่ QR อ่านไม่ออก และหน้าเว็บบอกเรื่องนี้ตรง ๆ กับผู้สมัคร เพราะคนระวังการอัปโหลดสลิปธนาคารอย่างสมเหตุสมผล
+
+### การกันกดซ้ำ
+
+ทุก request ผ่าน `run` ที่ปฏิเสธการเริ่ม request ที่สองระหว่างที่ยังมี request ค้าง เป็น ref ไม่ใช่ state เพราะต้องอ่านและเขียนได้ทันทีใน event เดียว ปุ่มที่ disabled เป็นการบอกคน ไม่ใช่ lock
+
+ข้อจำกัดที่ตรวจไม่ได้ในสภาพแวดล้อม test: React flush `setBusy(true)` จบ event แรกก่อน click ที่สองมาถึง ปุ่มจึง disabled ไปแล้ว การเอา lock ออกจึงไม่ทำให้ test fail — test ยืนยัน **ผลลัพธ์** (กดสามครั้งได้ request เดียว) ไม่ใช่ว่ากลไกไหนทำให้เป็นเช่นนั้น lock คือการกันกรณีที่ pointer event สองอันมาถึงก่อน React render ซึ่ง jsdom สร้างไม่ได้
+
+### Error ที่ผู้ใช้เห็น
+
+`api/client.ts` แปลงทุกความล้มเหลวเป็นข้อความที่ผู้สมัครทำอะไรได้ API คืน code กับข้อความไทยที่เขียนไว้ให้ผู้สมัครอยู่แล้ว — ข้อความนั้นคือที่แสดง อย่างอื่น (network ล้ม, gateway error, body ที่ parse ไม่ได้) กลายเป็นข้อความไทยกลาง ๆ ที่นี่ ข้อความของ provider หรือ framework จึงไปถึงหน้าจอไม่ได้ (หัวข้อ 63)
+
+### Accessibility
+
+ทุก input ผ่าน component `Field` เดียว จึงทำให้ "ทุกช่องมี label" เป็นคุณสมบัติของโค้ด ไม่ใช่ความเคยชิน — error ผูกด้วย `aria-describedby` + `aria-invalid` + `role="alert"` และ required ทำเครื่องหมายทั้งด้วยสายตาและด้วย attribute เพราะดอกจันสีแดงมองไม่เห็นสำหรับ screen reader และสำหรับคนที่แยกสีไม่ได้
+
+heading ของแต่ละขั้นถูก focus เมื่อเปลี่ยนขั้น เพราะใน wizard หน้าเดียวไม่มีอะไรประกาศการเปลี่ยนขั้น ผู้ใช้ screen reader ที่กด "ถัดไป" จะได้ยินความเงียบและต้องไปหาเองว่าอะไรเปลี่ยน
 
 ## Decision records
 

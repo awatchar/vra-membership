@@ -27,7 +27,8 @@ export default tseslint.config(
       '.wrangler/**',
       'node_modules/**',
       'worker-configuration.d.ts',
-      'api/**',
+      // Anchored, so it cannot swallow a nested directory named `api`.
+      '/api/**',
     ],
   },
   js.configs.recommended,

@@ -1,0 +1,463 @@
+/*
+ * Wizard layout.
+ *
+ * One column at every width. The layout that works on a 360px phone also works
+ * on a desktop with a wider margin, and a second column would only be there to
+ * fill space - so the maximum width grows and nothing reflows. That is what
+ * makes mobile-first a structure here rather than a claim.
+ *
+ * Tap targets are at least 44px tall throughout, which is the smallest a finger
+ * hits reliably, and inputs are 1rem so iOS Safari does not zoom the page when
+ * one is focused.
+ */
+
+.vra-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.vra-step {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: var(--vra-radius);
+  padding: 1.25rem 1rem 1.5rem;
+}
+
+.vra-step__title:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 4px;
+}
+
+.vra-step__intro,
+.vra-step__body > * + * {
+  margin-top: 1rem;
+}
+
+.vra-step__footer {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--vra-border);
+  padding-top: 1rem;
+}
+
+.vra-subheading {
+  font-size: 1.0625rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.vra-progress {
+  margin-bottom: 1rem;
+}
+
+.vra-progress__text {
+  color: var(--vra-text-muted);
+  font-size: 0.875rem;
+  margin: 0 0 0.375rem;
+}
+
+.vra-progress__track {
+  background: var(--vra-surface-muted);
+  border-radius: 999px;
+  height: 0.5rem;
+  overflow: hidden;
+}
+
+.vra-progress__bar {
+  background: var(--vra-navy);
+  height: 100%;
+  transition: width 200ms ease;
+}
+
+/* ------------------------------------------------------------------ form --- */
+
+.vra-field {
+  margin-top: 1rem;
+}
+
+.vra-field__label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.vra-field__required {
+  color: var(--vra-danger);
+}
+
+.vra-field__hint,
+.vra-field__error {
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.vra-field__hint {
+  color: var(--vra-text-muted);
+}
+
+.vra-field__error {
+  color: var(--vra-danger);
+  font-weight: 600;
+}
+
+.vra-input {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: 10px;
+  color: var(--vra-text);
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  width: 100%;
+}
+
+.vra-input:focus-visible {
+  border-color: var(--vra-navy);
+  outline: 2px solid var(--vra-navy);
+  outline-offset: 1px;
+}
+
+.vra-input--error {
+  border-color: var(--vra-danger);
+}
+
+.vra-fieldset {
+  border: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.vra-checkbox,
+.vra-radio {
+  align-items: flex-start;
+  background: var(--vra-surface-muted);
+  border: 1px solid var(--vra-border);
+  border-radius: 10px;
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.75rem;
+}
+
+.vra-checkbox--emphasis {
+  border-color: var(--vra-navy);
+}
+
+.vra-checkbox input,
+.vra-radio input {
+  flex: none;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  width: 1.25rem;
+}
+
+.vra-radio--plan > span {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.vra-radio__title {
+  font-weight: 600;
+}
+
+.vra-radio__price {
+  color: var(--vra-navy);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.vra-radio__detail {
+  color: var(--vra-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ---------------------------------------------------------------- button --- */
+
+.vra-button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  min-height: 2.875rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+}
+
+.vra-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.vra-button--primary {
+  background: var(--vra-navy);
+  color: #ffffff;
+}
+
+.vra-button--secondary {
+  background: var(--vra-surface);
+  border-color: var(--vra-navy);
+  color: var(--vra-navy);
+}
+
+.vra-button--quiet {
+  background: transparent;
+  color: var(--vra-text-muted);
+  margin-top: 0;
+}
+
+.vra-button:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------- alert --- */
+
+.vra-alert {
+  border: 1px solid var(--vra-border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 0.75rem 0.875rem;
+}
+
+.vra-alert p {
+  margin: 0.375rem 0 0;
+}
+
+.vra-alert p:first-child {
+  margin-top: 0;
+}
+
+.vra-alert__title {
+  font-weight: 700;
+}
+
+.vra-alert--error {
+  border-left-color: var(--vra-danger);
+}
+
+.vra-alert--info {
+  border-left-color: var(--vra-navy);
+}
+
+.vra-alert--success {
+  border-left-color: #1b7f4d;
+}
+
+/* -------------------------------------------------------------- pictures --- */
+
+.vra-picker {
+  margin-top: 1rem;
+}
+
+.vra-picker__label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.375rem;
+}
+
+.vra-picker__input {
+  font: inherit;
+  width: 100%;
+}
+
+.vra-crop__frame {
+  background: #000000;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+
+.vra-crop__image {
+  display: block;
+  width: 100%;
+}
+
+.vra-crop__window {
+  aspect-ratio: 1;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 45%);
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.vra-crop__frame:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 2px;
+}
+
+.vra-crop__zoom {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.vra-crop__zoom input {
+  width: 100%;
+}
+
+.vra-photo-preview {
+  border: 1px solid var(--vra-border);
+  border-radius: 10px;
+  display: block;
+  max-width: 12rem;
+  width: 100%;
+}
+
+/* --------------------------------------------------------------- payment --- */
+
+.vra-amount {
+  background: var(--vra-surface-muted);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  text-align: center;
+}
+
+.vra-amount__label {
+  color: var(--vra-text-muted);
+  margin: 0;
+}
+
+.vra-amount__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0;
+}
+
+.vra-qr-wrap {
+  text-align: center;
+}
+
+.vra-qr {
+  background: #ffffff;
+  border-radius: 8px;
+  height: auto;
+  max-width: 15rem;
+  padding: 0.5rem;
+  width: 100%;
+}
+
+.vra-details {
+  margin: 1rem 0 0;
+}
+
+.vra-details__row {
+  border-bottom: 1px solid var(--vra-border);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+.vra-details dt {
+  color: var(--vra-text-muted);
+}
+
+.vra-details dd {
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* --------------------------------------------------------------- notices --- */
+
+.vra-notice {
+  margin: 0;
+}
+
+.vra-notice__item + .vra-notice__item {
+  margin-top: 0.875rem;
+}
+
+.vra-notice__term {
+  font-weight: 700;
+}
+
+.vra-notice__detail {
+  color: var(--vra-text-muted);
+  margin: 0.125rem 0 0;
+}
+
+.vra-tips {
+  color: var(--vra-text-muted);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.vra-divider {
+  border: 0;
+  border-top: 1px solid var(--vra-border);
+  margin: 1.5rem 0;
+}
+
+.vra-reference {
+  background: var(--vra-surface-muted);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  text-align: center;
+}
+
+.vra-reference__label {
+  color: var(--vra-text-muted);
+  margin: 0;
+}
+
+.vra-reference__value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.vra-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vra-checklist__item {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.375rem 0;
+}
+
+.vra-checklist__mark {
+  flex: none;
+  font-weight: 700;
+  width: 1.25rem;
+}
+
+.vra-turnstile {
+  margin-top: 1rem;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --vra-max-width: 38rem;
+  }
+
+  .vra-step {
+    padding: 1.75rem;
+  }
+
+  /* Buttons stop filling the width once there is room for a natural size. */
+  .vra-button {
+    width: auto;
+    min-width: 12rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vra-progress__bar {
+    transition: none;
+  }
+}
