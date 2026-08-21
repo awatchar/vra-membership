@@ -39,11 +39,16 @@ const REQUEST_TIMEOUT_MS = 20_000;
  */
 const FAILURE_BY_CODE: Readonly<Record<number, SlipFailureReason>> = {
   1000: 'SLIP_UNREADABLE',
+  1001: 'PROVIDER_ERROR', // branch not found
   1002: 'PROVIDER_ERROR', // bad API key: our problem, not the applicant's
+  1003: 'PROVIDER_ERROR', // package expired
   1004: 'PROVIDER_ERROR', // quota exhausted
+  1005: 'SLIP_UNREADABLE',
   1006: 'SLIP_UNREADABLE',
   1007: 'SLIP_UNREADABLE',
   1008: 'SLIP_UNREADABLE',
+  1009: 'PROVIDER_ERROR', // upstream bank is temporarily unavailable
+  1010: 'PROVIDER_ERROR', // bank requires a short verification delay
   1011: 'SLIP_NOT_FOUND',
   1012: 'DUPLICATE_SLIP',
   1013: 'AMOUNT_MISMATCH',
@@ -99,6 +104,24 @@ function amountSatang(value: unknown): number | null {
   const numeric = typeof value === 'number' ? value : Number(text(value));
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
   return Math.round(numeric * 100);
+}
+
+/**
+ * Gives SlipOK's multipart decoder the extension it requires without carrying
+ * the applicant's original filename across the provider boundary. The route
+ * has already validated the bytes and normalized the content type.
+ */
+function multipartFilename(contentType: string): string {
+  switch (contentType) {
+    case 'image/jpeg':
+      return 'slip.jpg';
+    case 'image/png':
+      return 'slip.png';
+    case 'image/webp':
+      return 'slip.webp';
+    default:
+      return 'slip.bin';
+  }
 }
 
 /**
@@ -192,7 +215,11 @@ export function createSlipOkProvider(options: SlipOkOptions): SlipVerificationPr
     }
 
     const form = new FormData();
-    form.append('files', new Blob([evidence.image.bytes], { type: evidence.image.contentType }));
+    form.append(
+      'files',
+      new Blob([evidence.image.bytes], { type: evidence.image.contentType }),
+      multipartFilename(evidence.image.contentType),
+    );
     form.append('amount', String(amount));
     form.append('log', 'true');
     return { body: form, headers: {} };
@@ -227,6 +254,19 @@ export function createSlipOkProvider(options: SlipOkOptions): SlipVerificationPr
 
       if (!response.ok) {
         const code = (payload as SlipOkResponse | null)?.code;
+
+        // With `log: true`, SlipOK compares the receiver with the account linked
+        // to its branch and answers 1014 when they differ. Its documented 1014
+        // response still contains the verified bank transaction. That branch
+        // setting is not our authority: the payment service immediately checks
+        // the returned receiver against VRA_BANK_ACCOUNT, then checks amount,
+        // duplicate reference and timestamp. Preserve the verified transaction
+        // for those fail-closed local checks instead of misreporting an outage.
+        if (code === 1014) {
+          const transaction = mapSlipOkResponse(payload);
+          if (transaction !== null) return { ok: true, transaction };
+        }
+
         // An unmapped code becomes a generic provider error rather than being
         // reported as something it is not.
         return {
