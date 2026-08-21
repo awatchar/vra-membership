@@ -391,7 +391,7 @@ describe('POST /api/member-photo', () => {
     expect(response.status).toBe(415);
   });
 
-  it('refuses a photo that is not 3:4', async () => {
+  it('stores a full square photo without requiring a 3:4 crop', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
 
@@ -399,8 +399,8 @@ describe('POST /api/member-photo', () => {
       photoRequest(photoForm(id, { bytes: makeMemberPhoto({ width: 800, height: 800 }) })),
     );
 
-    expect(response.status).toBe(422);
-    await expect(objectKeys()).resolves.toEqual([]);
+    expect(response.status).toBe(200);
+    await expect(objectKeys()).resolves.toHaveLength(1);
   });
 
   it('refuses a request with no file', async () => {

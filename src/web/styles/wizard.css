@@ -268,48 +268,45 @@
   width: 100%;
 }
 
-.vra-crop__frame {
-  background: #000000;
-  border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-  touch-action: none;
-}
-
-.vra-crop__image {
-  display: block;
-  width: 100%;
-}
-
-.vra-crop__window {
-  aspect-ratio: 1;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 9999px rgb(0 0 0 / 45%);
-  pointer-events: none;
-  position: absolute;
-  transform: translate(-50%, -50%);
-}
-
-.vra-crop__frame:focus-visible {
-  outline: 3px solid var(--vra-navy);
-  outline-offset: 2px;
-}
-
-.vra-crop__zoom {
-  display: block;
-  margin-top: 0.75rem;
-}
-
-.vra-crop__zoom input {
-  width: 100%;
-}
-
 .vra-photo-preview {
   border: 1px solid var(--vra-border);
   border-radius: 10px;
   display: block;
-  max-width: 12rem;
+  height: auto;
+  max-height: 24rem;
+  max-width: min(100%, 20rem);
+  object-fit: contain;
+  width: auto;
+}
+
+/* --------------------------------------------------------------- dialog --- */
+
+.vra-dialog-backdrop {
+  align-items: center;
+  background: rgb(11 24 43 / 65%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 1000;
+}
+
+.vra-dialog {
+  background: var(--vra-surface);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 30%);
+  max-width: 30rem;
+  padding: 1.25rem;
   width: 100%;
+}
+
+.vra-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
 }
 
 /* --------------------------------------------------------------- payment --- */

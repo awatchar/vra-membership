@@ -78,6 +78,16 @@ beforeEach(() => {
   release = null;
   routes = {
     '/api/config': { body: { turnstileSiteKey: null, environment: 'development' } },
+    '/api/member-photo': {
+      body: {
+        stored: true,
+        source: 'UPLOAD',
+        width: 1200,
+        height: 900,
+        metadataStripped: false,
+        replacedPrevious: false,
+      },
+    },
     '/api/applications/application-1': { body: { application: CREATED.application } },
     '/api/applications': { body: CREATED, status: 201 },
   };
@@ -100,6 +110,23 @@ async function fillIdentity(user: ReturnType<typeof userEvent.setup>): Promise<v
   await user.type(screen.getByLabelText(/เลขบัตรประชาชน/), VALID_ID);
   await user.type(screen.getByLabelText(/ชื่อ \(ภาษาไทย\)/), 'ทดสอบ');
   await user.type(screen.getByLabelText(/นามสกุล \(ภาษาไทย\)/), 'ระบบสมัคร');
+}
+
+async function reachAddress(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await reachIdentity(user);
+  await fillIdentity(user);
+  await user.click(screen.getByRole('button', { name: 'ยืนยันข้อมูลนี้' }));
+  await waitFor(() => expect(screen.getByLabelText(/อีเมล/)).toBeInTheDocument());
+  await user.type(screen.getByLabelText(/อีเมล/), 'member@example.test');
+  await user.type(screen.getByLabelText(/หมายเลขโทรศัพท์/), '0812345678');
+  await user.click(screen.getByRole('button', { name: 'ถัดไป' }));
+  await waitFor(() => expect(screen.getByLabelText(/^ที่อยู่ตามบัตร/)).toBeInTheDocument());
+}
+
+async function fillSameAddress(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.type(screen.getByLabelText(/^ที่อยู่ตามบัตร/), '99/9 หมู่ 9');
+  await user.type(screen.getByLabelText(/^จังหวัด/), 'จังหวัดทดสอบ');
+  await user.type(screen.getByLabelText(/รหัสไปรษณีย์/), '10200');
 }
 
 describe('the privacy notice', () => {
@@ -381,6 +408,109 @@ describe('going back', () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/^ที่อยู่ตามบัตร/)).toHaveValue('99/9 หมู่ 9'),
     );
+  });
+});
+
+describe('confirming the delivery address', () => {
+  it('requires a second confirmation and cancel sends no address request', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachAddress(user);
+    await fillSameAddress(user);
+    const patchesBeforeSubmit = calls.filter((entry) => entry.method === 'PATCH').length;
+
+    await user.click(screen.getByRole('button', { name: 'ถัดไป' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'ยืนยันที่อยู่จัดส่งเอกสาร' });
+    expect(dialog).toHaveTextContent('เอกสารจะถูกส่งไปยังที่อยู่ตามบัตรประชาชน');
+    expect(calls.filter((entry) => entry.method === 'PATCH')).toHaveLength(patchesBeforeSubmit);
+
+    const cancel = screen.getByRole('button', { name: 'ยกเลิก' });
+    expect(cancel).toHaveFocus();
+    await user.click(cancel);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^ที่อยู่ตามบัตร/)).toBeInTheDocument();
+    expect(calls.filter((entry) => entry.method === 'PATCH')).toHaveLength(patchesBeforeSubmit);
+  });
+
+  it('sends the address once only after explicit confirmation', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachAddress(user);
+    await fillSameAddress(user);
+    const patchesBeforeSubmit = calls.filter((entry) => entry.method === 'PATCH').length;
+
+    await user.click(screen.getByRole('button', { name: 'ถัดไป' }));
+    await user.click(screen.getByRole('button', { name: 'ยืนยันใช้ที่อยู่ตามบัตร' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('รูปสำหรับบัตรสมาชิก'),
+    );
+    expect(calls.filter((entry) => entry.method === 'PATCH')).toHaveLength(patchesBeforeSubmit + 1);
+  });
+});
+
+describe('submitting the full member photo', () => {
+  it('uses a fresh photo-step Turnstile token and does not crop the upload', async () => {
+    routes['/api/config'] = {
+      body: { turnstileSiteKey: 'test-only-site-key', environment: 'production' },
+    };
+
+    const previous = (globalThis as { turnstile?: unknown }).turnstile;
+    (globalThis as { turnstile?: unknown }).turnstile = {
+      render: (
+        _container: HTMLElement,
+        options: { action?: string; callback: (token: string) => void },
+      ) => {
+        options.callback(`${options.action ?? 'unknown'}-token`);
+        return `${options.action ?? 'unknown'}-widget`;
+      },
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+      await reachAddress(user);
+      await fillSameAddress(user);
+      await user.click(screen.getByRole('button', { name: 'ถัดไป' }));
+      await user.click(screen.getByRole('button', { name: 'ยืนยันใช้ที่อยู่ตามบัตร' }));
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('รูปสำหรับบัตรสมาชิก'),
+      );
+
+      await user.click(screen.getByRole('radio', { name: 'อัปโหลดรูปใหม่' }));
+      const upload = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], 'full-frame.jpg', {
+        type: 'image/jpeg',
+      });
+      await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, upload);
+      await screen.findByAltText('ตัวอย่างรูปสำหรับบัตรสมาชิกที่เลือกไว้');
+
+      expect(screen.getByText('ระบบจะส่งรูปเต็มตามที่แสดง โดยไม่ครอบตัดรูป')).toBeInTheDocument();
+      expect(screen.queryByText('ปรับกรอบรูป')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('checkbox', { name: /เห็นใบหน้าชัดเจน/ }));
+      await user.click(screen.getByRole('checkbox', { name: /ไม่สวมหมวก/ }));
+      await user.click(screen.getByRole('checkbox', { name: /เป็นรูปที่ถ่ายไม่นาน/ }));
+      await user.click(screen.getByRole('button', { name: 'ยืนยันรูปนี้' }));
+
+      await waitFor(() =>
+        expect(calls.some((call) => call.url === '/api/member-photo')).toBe(true),
+      );
+      const request = calls.find((call) => call.url === '/api/member-photo')!;
+      expect(request.headers.get('cf-turnstile-response')).toBe('member_photo-token');
+      expect(request.headers.get('cf-turnstile-response')).not.toBe('application-token');
+      const form = request.body as FormData;
+      for (const [, value] of form.entries()) {
+        if (typeof value === 'string') expect(value).not.toContain('member_photo-token');
+      }
+      const photo = form.get('photo');
+      expect(photo).toBeInstanceOf(File);
+      expect((photo as File).size).toBe(upload.size);
+    } finally {
+      (globalThis as { turnstile?: unknown }).turnstile = previous;
+    }
   });
 });
 

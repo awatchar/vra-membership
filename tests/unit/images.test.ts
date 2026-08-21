@@ -132,7 +132,7 @@ describe('stripJpegMetadata', () => {
 });
 
 describe('verifyMemberPhoto', () => {
-  it('accepts a 3:4 photo of adequate size', () => {
+  it('accepts a full photo of adequate size', () => {
     const verified = verifyMemberPhoto(makeMemberPhoto(), 'image/jpeg');
 
     expect(verified.dimensions).toEqual({ width: 600, height: 800 });
@@ -146,7 +146,7 @@ describe('verifyMemberPhoto', () => {
     expect(contains(verified.bytes, GPS_MARKER)).toBe(false);
   });
 
-  it('accepts other sizes at the same ratio', () => {
+  it('accepts other sizes within the safe bounds', () => {
     expect(
       verifyMemberPhoto(makeMemberPhoto({ width: 900, height: 1200 }), 'image/jpeg'),
     ).toBeTruthy();
@@ -155,18 +155,13 @@ describe('verifyMemberPhoto', () => {
     ).toBeTruthy();
   });
 
-  it('rejects a photo that is not 3:4', () => {
-    // A square or landscape crop would print wrong on the card.
-    expect(() =>
+  it('accepts square, landscape and portrait frames without cropping', () => {
+    expect(
       verifyMemberPhoto(makeMemberPhoto({ width: 800, height: 800 }), 'image/jpeg'),
-    ).toThrow(ApiError);
-    expect(() =>
+    ).toBeTruthy();
+    expect(
       verifyMemberPhoto(makeMemberPhoto({ width: 800, height: 600 }), 'image/jpeg'),
-    ).toThrow(ApiError);
-  });
-
-  it('tolerates the rounding a browser crop produces', () => {
-    // 601x800 is 0.75125, which a pixel-aligned crop can easily land on.
+    ).toBeTruthy();
     expect(
       verifyMemberPhoto(makeMemberPhoto({ width: 601, height: 800 }), 'image/jpeg'),
     ).toBeTruthy();
@@ -199,7 +194,7 @@ describe('verifyMemberPhoto', () => {
   it('never echoes image content in a rejection message', () => {
     try {
       verifyMemberPhoto(
-        makeMemberPhoto({ width: 800, height: 800, comment: GPS_MARKER }),
+        makeMemberPhoto({ width: 150, height: 200, comment: GPS_MARKER }),
         'image/jpeg',
       );
       expect.unreachable('verifyMemberPhoto should have thrown');

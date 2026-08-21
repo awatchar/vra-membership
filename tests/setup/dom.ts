@@ -20,8 +20,7 @@ import '@testing-library/jest-dom/vitest';
  * for anything in this repository: the code under test still calls
  * `createImageBitmap`, `getContext('2d')`, `drawImage` and `toBlob` in the same
  * order with the same arguments, and a test can inspect what it asked for. What
- * cannot be checked here is the pixels, which is a real limit and the reason the
- * crop geometry is unit-tested as arithmetic separately.
+ * cannot be checked here is the resulting pixels, which is a real limit.
  */
 
 /** A one-pixel JPEG, so a stubbed encode returns something plausible. */

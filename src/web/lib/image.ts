@@ -1,18 +1,14 @@
 /**
  * Image handling in the browser.
  *
- * Two jobs: shrink what gets uploaded, and crop the member photo to the square
- * the card needs. Both happen on a canvas, which has a useful side effect - the
- * output is re-encoded pixel data, so EXIF, GPS coordinates and the original
- * camera metadata do not survive. The server strips metadata too; this means the
- * data never leaves the device in the first place.
+ * Shrinks large uploads while preserving their full frame and aspect ratio.
+ * Canvas re-encoding has a useful side effect: EXIF, GPS coordinates and the
+ * original camera metadata do not survive. The server strips JPEG metadata too
+ * because a small JPEG can skip re-encoding here.
  */
 
 /** Longest edge of an ID card image sent for OCR. */
 export const CARD_MAX_EDGE = 1600;
-/** The member photo is square; this is its edge length. */
-export const PHOTO_EDGE = 600;
-
 const JPEG_QUALITY = 0.9;
 
 export interface LoadedImage {
@@ -84,61 +80,6 @@ export async function downscale(file: Blob, maxEdge = CARD_MAX_EDGE): Promise<Bl
   const context = canvas.getContext('2d');
   if (!context) throw new Error('เบราว์เซอร์นี้ไม่รองรับการประมวลผลภาพ');
   context.drawImage(image.bitmap, 0, 0, canvas.width, canvas.height);
-
-  return toJpeg(canvas);
-}
-
-export interface CropRegion {
-  /** Fraction of the source width, 0-1. */
-  x: number;
-  y: number;
-  /** Fraction of the shorter source edge. */
-  size: number;
-}
-
-/** The largest centred square, which is where the crop control starts. */
-export function centredSquare(): CropRegion {
-  return { x: 0.5, y: 0.5, size: 1 };
-}
-
-/**
- * Cuts a square out of `file` and returns it as a JPEG.
- *
- * The region is expressed in fractions rather than pixels so the control that
- * produced it does not have to know the source resolution - the preview is
- * whatever size fits the phone, and the crop is applied to the full-resolution
- * original.
- */
-export async function cropToSquare(
-  file: Blob,
-  region: CropRegion,
-  edge = PHOTO_EDGE,
-): Promise<Blob> {
-  const image = await loadImage(file);
-  const shorter = Math.min(image.width, image.height);
-  const side = Math.max(1, Math.round(shorter * Math.min(1, Math.max(0.1, region.size))));
-
-  // The centre is clamped so the square stays inside the image however far the
-  // applicant dragged it.
-  const half = side / 2;
-  const centreX = Math.min(Math.max(region.x * image.width, half), image.width - half);
-  const centreY = Math.min(Math.max(region.y * image.height, half), image.height - half);
-
-  const canvas = canvasOf(edge, edge);
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('เบราว์เซอร์นี้ไม่รองรับการประมวลผลภาพ');
-
-  context.drawImage(
-    image.bitmap,
-    Math.round(centreX - half),
-    Math.round(centreY - half),
-    side,
-    side,
-    0,
-    0,
-    edge,
-    edge,
-  );
 
   return toJpeg(canvas);
 }

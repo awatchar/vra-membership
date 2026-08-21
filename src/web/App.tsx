@@ -7,8 +7,7 @@ import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { StepFrame } from './components/StepFrame';
 import { TurnstileGate } from './components/TurnstileGate';
-import { base64ToBlob, centredSquare, cropToSquare, downscale } from './lib/image';
-import type { CropRegion } from './lib/image';
+import { base64ToBlob, downscale } from './lib/image';
 import { decodeQrFromImage, looksLikeSlipPayload } from './lib/qr';
 import { INITIAL_STATE, canSubmitPhoto, previousStep, wizardReducer } from './state/wizard';
 import type { HeldImage } from './state/wizard';
@@ -85,8 +84,8 @@ export function App() {
   const [identityErrors, setIdentityErrors] = useState<FieldErrors<IdentityField>>({});
   const [contactErrors, setContactErrors] = useState<FieldErrors<ContactField>>({});
   const [addressErrors, setAddressErrors] = useState<FieldErrors<AddressField>>({});
+  const [confirmingIdAddress, setConfirmingIdAddress] = useState(false);
 
-  const [region, setRegion] = useState<CropRegion>(centredSquare());
   const [usedImageFallback, setUsedImageFallback] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileRound, setTurnstileRound] = useState(0);
@@ -100,6 +99,11 @@ export function App() {
    */
   const inFlight = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken(null);
+    setTurnstileRound((round) => round + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,24 +129,26 @@ export function App() {
     headingRef.current?.focus();
   }, [state.step]);
 
-  const run = useCallback(async (task: () => Promise<void>) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      await task();
-    } catch (caught) {
-      setError(messageFor(caught));
-      // A Turnstile token is single-use, so the next attempt needs a fresh
-      // challenge or it will fail again for a reason the applicant cannot see.
-      setTurnstileToken(null);
-      setTurnstileRound((round) => round + 1);
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  }, []);
+  const run = useCallback(
+    async (task: () => Promise<void>) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      setBusy(true);
+      setError(null);
+      try {
+        await task();
+      } catch (caught) {
+        setError(messageFor(caught));
+        // A Turnstile token is single-use, so the next attempt needs a fresh
+        // challenge or it will fail again for a reason the applicant cannot see.
+        resetTurnstile();
+      } finally {
+        inFlight.current = false;
+        setBusy(false);
+      }
+    },
+    [resetTurnstile],
+  );
 
   const token = state.accessToken;
 
@@ -159,8 +165,7 @@ export function App() {
         fields: response.data,
         faceImage: face ? hold(base64ToBlob(face.base64, face.contentType)) : null,
       });
-      setTurnstileRound((round) => round + 1);
-      setTurnstileToken(null);
+      resetTurnstile();
     });
 
   const submitIdentity = () => {
@@ -189,6 +194,10 @@ export function App() {
         accessToken: created.accessToken,
         hasPrevious: created.hasPreviousApplication,
       });
+      // The application challenge has now been spent. Leaving it in state
+      // would let a later guarded step briefly see and submit a stale token
+      // before its own widget finishes rendering.
+      resetTurnstile();
     });
   };
 
@@ -211,11 +220,8 @@ export function App() {
     });
   };
 
-  const submitAddress = () => {
-    const errors = validateAddress(state.address);
-    setAddressErrors(errors);
-    if (hasErrors(errors) || !state.applicationId || !token) return;
-
+  const saveAddress = () => {
+    if (!state.applicationId || !token) return;
     const values = state.address;
     void run(async () => {
       await api.update(
@@ -242,47 +248,52 @@ export function App() {
     });
   };
 
+  const submitAddress = () => {
+    const errors = validateAddress(state.address);
+    setAddressErrors(errors);
+    if (hasErrors(errors) || !state.applicationId || !token) return;
+
+    if (state.address.mailSameAsId) {
+      setConfirmingIdAddress(true);
+      return;
+    }
+
+    saveAddress();
+  };
+
+  const confirmIdAddress = () => {
+    setConfirmingIdAddress(false);
+    saveAddress();
+  };
+
   const chooseUpload = (file: File) =>
     run(async () => {
       const scaled = await downscale(file, 1400);
+      resetTurnstile();
       dispatch({ type: 'SET_UPLOADED_PHOTO', image: hold(scaled) });
-      setRegion(centredSquare());
-      dispatch({
-        type: 'SET_CROPPED_PHOTO',
-        image: hold(await cropToSquare(scaled, centredSquare())),
-      });
     });
 
-  // Re-cuts the square whenever the crop moves, so the preview and the checklist
-  // always describe the image that will actually be sent.
-  const applyRegion = (next: CropRegion) => {
-    setRegion(next);
-    const source = state.photoSource === 'ID_CARD' ? state.faceImage : state.uploadedPhoto;
-    if (!source) return;
-    void cropToSquare(source.blob, next)
-      .then((blob) => dispatch({ type: 'SET_CROPPED_PHOTO', image: hold(blob) }))
-      .catch(() => setError('ไม่สามารถตัดกรอบรูปนี้ได้ กรุณาลองเลือกรูปอื่น'));
-  };
-
   const chooseSource = (source: 'ID_CARD' | 'UPLOAD') => {
+    resetTurnstile();
     dispatch({ type: 'CHOOSE_PHOTO_SOURCE', source });
-    setRegion(centredSquare());
-
-    if (source === 'ID_CARD' && state.faceImage) {
-      void cropToSquare(state.faceImage.blob, centredSquare())
-        .then((blob) => dispatch({ type: 'SET_CROPPED_PHOTO', image: hold(blob) }))
-        .catch(() => setError('ไม่สามารถใช้ภาพจากบัตรได้ กรุณาอัปโหลดรูปใหม่'));
-    } else {
-      dispatch({ type: 'SET_CROPPED_PHOTO', image: null });
-    }
   };
 
   const submitPhoto = () => {
-    if (!canSubmitPhoto(state) || !state.applicationId || !token || !state.croppedPhoto) return;
+    const photo = state.photoSource === 'ID_CARD' ? state.faceImage : state.uploadedPhoto;
+    const requiresTurnstile = Boolean(config?.turnstileSiteKey);
+    if (
+      !canSubmitPhoto(state) ||
+      !state.applicationId ||
+      !token ||
+      !photo ||
+      (requiresTurnstile && !turnstileToken)
+    )
+      return;
     const source = state.photoSource!;
 
     void run(async () => {
-      await api.storePhoto(state.applicationId!, state.croppedPhoto!.blob, source, token);
+      await api.storePhoto(state.applicationId!, photo.blob, source, token, turnstileToken);
+      resetTurnstile();
       dispatch({ type: 'PHOTO_STORED' });
     });
   };
@@ -382,7 +393,10 @@ export function App() {
             back ? (
               <Button
                 variant="quiet"
-                onClick={() => dispatch({ type: 'GO_TO', step: back })}
+                onClick={() => {
+                  resetTurnstile();
+                  dispatch({ type: 'GO_TO', step: back });
+                }}
                 disabled={busy}
               >
                 ย้อนกลับ
@@ -399,7 +413,10 @@ export function App() {
               busy={busy}
               error={error}
               onSelect={(file) => void readCard(file)}
-              onManualEntry={() => dispatch({ type: 'CHOOSE_MANUAL_ENTRY' })}
+              onManualEntry={() => {
+                resetTurnstile();
+                dispatch({ type: 'CHOOSE_MANUAL_ENTRY' });
+              }}
               turnstileSlot={gate('ocr')}
             />
           ) : null}
@@ -438,22 +455,31 @@ export function App() {
               fromOcr={state.ocrCompleted}
               onChange={(values) => dispatch({ type: 'SET_ADDRESS', values })}
               onSubmit={submitAddress}
+              confirmingSameAddress={confirmingIdAddress}
+              onCancelSameAddress={() => setConfirmingIdAddress(false)}
+              onConfirmSameAddress={confirmIdAddress}
             />
           ) : null}
 
           {state.step === 'photo' ? (
             <PhotoStep
               state={state}
-              region={region}
               busy={busy}
               error={error}
-              canSubmit={canSubmitPhoto(state)}
+              readyForHumanCheck={canSubmitPhoto(state)}
+              canSubmit={canSubmitPhoto(state) && (!siteKey || turnstileToken !== null)}
               onChooseSource={chooseSource}
-              onConsentChange={(accepted) => dispatch({ type: 'SET_ID_CARD_CONSENT', accepted })}
+              onConsentChange={(accepted) => {
+                resetTurnstile();
+                dispatch({ type: 'SET_ID_CARD_CONSENT', accepted });
+              }}
               onUpload={(file) => void chooseUpload(file)}
-              onRegionChange={applyRegion}
-              onChecklistChange={(values) => dispatch({ type: 'SET_PHOTO_CHECKLIST', values })}
+              onChecklistChange={(values) => {
+                resetTurnstile();
+                dispatch({ type: 'SET_PHOTO_CHECKLIST', values });
+              }}
               onSubmit={submitPhoto}
+              turnstileSlot={gate('member_photo')}
             />
           ) : null}
 

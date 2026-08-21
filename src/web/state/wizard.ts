@@ -70,8 +70,6 @@ export interface WizardState {
   /** Explicit consent to use the card's face image (Issue #1 section 61). */
   idCardPhotoConsent: boolean;
   uploadedPhoto: HeldImage | null;
-  /** The square crop the applicant confirmed. */
-  croppedPhoto: HeldImage | null;
   photoChecklist: { clearFace: boolean; noHat: boolean; recent: boolean };
   photoStored: boolean;
 
@@ -130,7 +128,6 @@ export const INITIAL_STATE: WizardState = {
   photoSource: null,
   idCardPhotoConsent: false,
   uploadedPhoto: null,
-  croppedPhoto: null,
   photoChecklist: { clearFace: false, noHat: false, recent: false },
   photoStored: false,
   membershipType: null,
@@ -155,7 +152,6 @@ export type WizardAction =
   | { type: 'CHOOSE_PHOTO_SOURCE'; source: 'ID_CARD' | 'UPLOAD' }
   | { type: 'SET_ID_CARD_CONSENT'; accepted: boolean }
   | { type: 'SET_UPLOADED_PHOTO'; image: HeldImage | null }
-  | { type: 'SET_CROPPED_PHOTO'; image: HeldImage | null }
   | { type: 'SET_PHOTO_CHECKLIST'; values: Partial<WizardState['photoChecklist']> }
   | { type: 'PHOTO_STORED' }
   | { type: 'CHOOSE_MEMBERSHIP'; membershipType: MembershipType }
@@ -254,10 +250,6 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       if (state.uploadedPhoto !== action.image) release(state.uploadedPhoto);
       return { ...state, uploadedPhoto: action.image, photoStored: false };
 
-    case 'SET_CROPPED_PHOTO':
-      if (state.croppedPhoto !== action.image) release(state.croppedPhoto);
-      return { ...state, croppedPhoto: action.image, photoStored: false };
-
     case 'SET_PHOTO_CHECKLIST':
       return { ...state, photoChecklist: { ...state.photoChecklist, ...action.values } };
 
@@ -296,9 +288,9 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 export function canSubmitPhoto(state: WizardState): boolean {
   const checklist = state.photoChecklist;
   const confirmed = checklist.clearFace && checklist.noHat && checklist.recent;
-  if (!confirmed || !state.croppedPhoto) return false;
-  if (state.photoSource === 'ID_CARD') return state.idCardPhotoConsent;
-  return state.photoSource === 'UPLOAD';
+  if (!confirmed) return false;
+  if (state.photoSource === 'ID_CARD') return Boolean(state.faceImage) && state.idCardPhotoConsent;
+  return state.photoSource === 'UPLOAD' && Boolean(state.uploadedPhoto);
 }
 
 /**

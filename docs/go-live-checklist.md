@@ -33,7 +33,7 @@ Production URL: `https://member.vra.or.th`
 - [ ] SlipOK ตรวจ valid/wrong amount/wrong receiver/duplicate/provider error โดยไม่ persist image
 - [ ] Receiver masking ของธนาคารจริงมีเลขที่ตรวจได้อย่างน้อย 4 หลัก หรือ fail เป็น `RECEIVER_UNVERIFIABLE`
 - [ ] PromptPay QR สแกนแล้วปลายทางและยอด FIVE_YEAR/LIFETIME ถูกต้อง
-- [ ] รูป crop จาก mobile browser อยู่ใน tolerance 0.02 และ 300x400 พิมพ์ได้จริง
+- [ ] รูปเต็มจาก mobile browser ทั้งแนวตั้ง จัตุรัส และแนวนอนถูกเก็บโดยไม่ crop, metadata ถูกลบ และความละเอียดขั้นต่ำพิมพ์ได้จริง
 
 ## Scenario A — สมาชิกสามัญราย 5 ปี 500 THB
 

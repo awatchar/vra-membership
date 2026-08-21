@@ -12,8 +12,8 @@
  * **React's inline styles are not affected.** `style={{...}}` is applied through
  * the CSSOM (`node.style.width = …`), and CSP governs style *attributes* and
  * `<style>` elements parsed from markup, not programmatic style changes. So
- * `style-src 'self'` holds with no exception for the progress bar or the crop
- * frame - which is why neither needed rewriting for this.
+ * `style-src 'self'` holds with no exception for the progress bar, which is why
+ * it does not need rewriting for this.
  *
  * The `camera` permission is denied outright, even though the wizard takes
  * photographs. It uses `<input type="file" capture>`, which hands off to the
@@ -50,7 +50,7 @@ const CSP_DIRECTIVES: readonly string[] = [
   // go through the CSSOM and are not covered by this.
   "style-src 'self'",
 
-  // `blob:` for the previews the wizard makes of a card, a face crop and a slip -
+  // `blob:` for the previews the wizard makes of a card, a face image and a slip -
   // those never leave the device, so they can only be shown from a blob URL.
   // `data:` for the favicon. `'self'` covers the member photo, which is streamed
   // by the Worker rather than served from R2 directly.

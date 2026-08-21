@@ -77,10 +77,10 @@ src/web/               React client, built to dist/client
   api/client.ts        the only place the browser talks to the API
   state/wizard.ts      one reducer holding every answer
   state/validation.ts  Thai messages that say what to do
-  lib/image.ts         downscale and square-crop on a canvas
+  lib/image.ts         proportional downscale on a canvas; never crops
   lib/qr.ts            slip QR read in the browser, not uploaded
   lib/turnstile.ts     the one third-party script, loaded lazily
-  components/          Field, Button, Alert, CropBox, QrCode, StepFrame
+  components/          Field, Button, Alert, QrCode, StepFrame
   components/SiteHeader.tsx  logo and association name, both halves
   components/SiteFooter.tsx  contact details, from configuration
   assets/vra-logo.png  192px, derived from assets/brand/ - see its README
@@ -204,7 +204,7 @@ Admin endpoint ที่เปลี่ยนสถานะเพิ่มอ�
 - **EXIF ถูกลบก่อนเขียนลง bucket** ภาพจากมือถืออาจมีพิกัด GPS หมายเลขเครื่อง และเวลาถ่าย เมื่อผูกกับใบหน้าของคนที่ระบุตัวได้ นั่นคือประวัติตำแหน่ง
 - **ต้องมีการยืนยันอย่างชัดเจน** การใช้ภาพใบหน้าจากบัตรโดยผู้สมัครไม่ได้เลือกเองคือสิ่งที่ Issue #1 หัวข้อ 61 ห้าม
 
-การครอบตัดและ re-encode ทำที่ browser ส่วน Worker เป็นฝ่าย **ตรวจ** ไม่ใช่เชื่อ: อ่านขนาดพิกเซลจาก container header (ไม่ต้องมี decoder) ตรวจสัดส่วน 3:4 และลบ metadata segment ทิ้ง Worker ไม่มี canvas และการใส่ WASM decoder จะเพิ่ม bundle size กับ CPU ทุก upload โดยไม่คุ้มที่ปริมาณ 1-2 ใบสมัครต่อวัน
+การย่อตามสัดส่วนและ re-encode รูปขนาดใหญ่ทำที่ browser ส่วน Worker เป็นฝ่าย **ตรวจ** ไม่ใช่เชื่อ: อ่านขนาดพิกเซลจาก container header (ไม่ต้องมี decoder) ตรวจช่วงความละเอียดและลบ metadata segment ทิ้ง Worker ไม่บังคับสัดส่วนรูปตามการตัดสินใจใน #52 และไม่มี canvas; การใส่ WASM decoder จะเพิ่ม bundle size กับ CPU ทุก upload โดยไม่คุ้มที่ปริมาณ 1-2 ใบสมัครต่อวัน
 
 รับเฉพาะ JPEG สำหรับรูปที่เก็บ เพราะ metadata ของ PNG และ WebP อยู่ใน chunk ที่โมดูลนี้ไม่ได้เขียนใหม่ การรับไว้จะเท่ากับเก็บ chunk ที่อาจมี EXIF หรือข้อความติดมา
 
@@ -374,7 +374,9 @@ NBTC_RECORDED → MEMBER_COMPLETION_EMAIL_SENT → COMPLETED
 
 checklist ยืนยันเป็นสามข้อ ไม่ใช่ข้อเดียว เพราะ "ยืนยันว่ารูปนี้ใช้ได้" คือช่องที่คนติ๊กโดยไม่อ่าน แต่ "เห็นใบหน้าชัด", "ไม่สวมหมวกหรือแว่นกันแดด" และ "ถ่ายไม่นานและเป็นรูปของตัวเอง" คือสามอย่างที่ต้องมองจริง (หัวข้อ 12)
 
-การ crop ทำบน canvas ซึ่งมีผลพลอยได้: output เป็น pixel ที่ encode ใหม่ EXIF และพิกัด GPS จึงไม่รอด — server ก็ strip metadata อยู่แล้ว แต่แบบนี้ข้อมูลไม่ออกจากเครื่องตั้งแต่แรก ตัวควบคุม crop ใช้ได้ด้วยคีย์บอร์ด (ปุ่มลูกศรเลื่อน, slider ย่อขยาย) เพราะเป็นขั้นที่ข้ามไม่ได้
+ตามการตัดสินใจของเจ้าของระบบใน #52 รูปที่เลือกถูกส่งทั้งเฟรมโดยไม่มี crop UI และไม่มีการตัด pixel ทั้งภาพจาก iApp และภาพอัปโหลดใหม่ยังมี preview กับ checklist เดิม ภาพขนาดใหญ่ถูกย่อตามสัดส่วนและ encode เป็น JPEG บน canvas จึงตัด EXIF/GPS ก่อนออกจากเครื่อง ส่วน JPEG ที่เล็กพอจะไม่ถูก encode ซ้ำ แต่ Worker strip metadata ก่อนเก็บอีกชั้นหนึ่ง Worker ไม่บังคับ aspect ratio แล้ว แต่ยังบังคับขนาดไฟล์ ช่วงความละเอียด magic bytes และ JPEG-only storage
+
+`POST /api/member-photo` เป็น public endpoint ที่มีทั้งค่า Worker/R2 และข้อมูลส่วนบุคคล จึงใช้ Turnstile เหมือน OCR และ payment หน้า photo render challenge ของตัวเองและส่ง token ใน header เท่านั้น token จาก OCR หรือการสร้างใบสมัครถูกล้างเมื่อใช้หรือออกจากขั้น เพื่อไม่ให้ challenge แบบ single-use ถูกนำกลับมาใช้เงียบ ๆ
 
 ### สลิป
 

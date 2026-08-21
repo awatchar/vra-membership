@@ -86,7 +86,7 @@ export function makeJpeg(options: JpegOptions): Uint8Array {
   return new Uint8Array(parts);
 }
 
-/** A member photo of the expected 3:4 shape, large enough to be accepted. */
+/** A member photo within the safe default dimensions. */
 export function makeMemberPhoto(overrides: Partial<JpegOptions> = {}): Uint8Array {
   return makeJpeg({ width: 600, height: 800, scanPaddingBytes: 200, ...overrides });
 }

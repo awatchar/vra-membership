@@ -198,6 +198,7 @@ export const api = {
     photo: Blob,
     source: PhotoSource,
     applicationToken: string,
+    turnstileToken: string | null,
   ): Promise<StoredPhoto> {
     const form = new FormData();
     form.append('applicationId', applicationId);
@@ -209,6 +210,7 @@ export const api = {
 
     return send<StoredPhoto>('/api/member-photo', { method: 'POST', body: form }, {
       applicationToken,
+      turnstileToken,
     });
   },
 
