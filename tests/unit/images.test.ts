@@ -173,6 +173,22 @@ describe('verifyMemberPhoto', () => {
     ).toThrow(ApiError);
   });
 
+  it('accepts a decodable provider face below the upload print recommendation', () => {
+    const verified = verifyMemberPhoto(makeMemberPhoto({ width: 150, height: 200 }), 'image/jpeg', {
+      requirePrintMinimum: false,
+    });
+
+    expect(verified.dimensions).toEqual({ width: 150, height: 200 });
+  });
+
+  it('still rejects an implausibly large provider face when the minimum is disabled', () => {
+    expect(() =>
+      verifyMemberPhoto(makeMemberPhoto({ width: 3000, height: 4000 }), 'image/jpeg', {
+        requirePrintMinimum: false,
+      }),
+    ).toThrow(ApiError);
+  });
+
   it('rejects an implausibly large photo', () => {
     expect(() =>
       verifyMemberPhoto(makeMemberPhoto({ width: 3000, height: 4000 }), 'image/jpeg'),
