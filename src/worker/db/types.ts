@@ -26,7 +26,7 @@ export const APPLICATION_STATUSES = [
 ] as const;
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
-export const MEMBERSHIP_TYPES = ['ANNUAL', 'LIFETIME'] as const;
+export const MEMBERSHIP_TYPES = ['FIVE_YEAR', 'LIFETIME'] as const;
 export type MembershipType = (typeof MEMBERSHIP_TYPES)[number];
 
 export const PHOTO_SOURCES = ['ID_CARD', 'UPLOAD'] as const;

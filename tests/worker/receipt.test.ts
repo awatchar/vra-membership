@@ -9,7 +9,7 @@ import { createNumberingService } from '../../src/worker/services/numbering';
 import { createReceiptService } from '../../src/worker/services/receipt';
 import { createStateMachine } from '../../src/worker/services/state-machine';
 import type { PaymentInput, Repository } from '../../src/worker/db';
-import { ANNUAL_SATANG, repository, seedApplication } from '../support/fixtures';
+import { FIVE_YEAR_SATANG, repository, seedApplication } from '../support/fixtures';
 import { extractComparableText, extractPdfText, withoutSaraAa } from '../support/pdf-text';
 
 /** 2026-08-20 in Bangkok, which is Buddhist year 2569. */
@@ -25,7 +25,7 @@ function paymentInput(applicationId: string, overrides: Partial<PaymentInput> = 
     applicationId,
     provider: 'slipok',
     transactionRef: `TXN-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: '002',
     receivingBank: 'ธนาคารตัวอย่าง',
     receiverAccountDigits: '7890',
@@ -45,7 +45,7 @@ async function paidApplication(
   overrides: Partial<PaymentInput> = {},
 ): Promise<string> {
   const id = await seedApplication(repo, citizenId);
-  await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+  await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
   await repo.applications.setReferenceNo(id, `VRA-2569-${crypto.randomUUID().slice(0, 6)}`);
   await repo.payments.create(paymentInput(id, overrides));
   const machine = createStateMachine(repo);
@@ -90,7 +90,7 @@ describe('renderReceiptPdf', () => {
     issuedAt: NOW,
     payerName: 'นาย ทดสอบ ระบบสมัคร',
     applicationReferenceNo: 'VRA-2569-000001',
-    membershipLabel: 'สมาชิกสามัญรายปี',
+    membershipLabel: 'สมาชิกสามัญราย 5 ปี',
     amountBaht: '500.00',
     transactionRef: 'TXN0000000000001',
     paidAt: new Date('2026-08-20T02:30:00.000Z'),
@@ -204,7 +204,7 @@ describe('issuing a receipt', () => {
 
     expect(created).toBe(true);
     expect(receipt.receiptNo).toBe('VRA-RC-2569-000001');
-    expect(receipt.amountSatang).toBe(ANNUAL_SATANG);
+    expect(receipt.amountSatang).toBe(FIVE_YEAR_SATANG);
   });
 
   it('returns the existing receipt instead of issuing a second number', async () => {
@@ -257,7 +257,7 @@ describe('issuing a receipt', () => {
   it('refuses when there is no verified payment', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
-    await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
 
     await expect(services(repo).issue(id)).rejects.toThrow(/ยังไม่มีการชำระเงิน/);
   });
@@ -265,7 +265,7 @@ describe('issuing a receipt', () => {
   it('ignores a rejected payment when looking for one', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
-    await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
     await repo.payments.create(
       paymentInput(id, { verificationStatus: 'REJECTED', receiverMatched: false }),
     );

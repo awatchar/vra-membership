@@ -78,6 +78,9 @@ function metadata(row: Row, column: string): EventMetadata | null {
 }
 
 export function toApplicationRecord(row: Row): ApplicationRecord {
+  const canonicalMembership = text(row, 'membership_term');
+  const legacyMembership = text(row, 'membership_type');
+
   return {
     id: requiredText(row, 'id'),
     referenceNo: text(row, 'reference_no'),
@@ -93,7 +96,8 @@ export function toApplicationRecord(row: Row): ApplicationRecord {
     phone: text(row, 'phone'),
     email: text(row, 'email'),
     callsign: text(row, 'callsign'),
-    membershipType: text(row, 'membership_type') as MembershipType | null,
+    membershipType: (canonicalMembership ??
+      (legacyMembership === 'ANNUAL' ? 'FIVE_YEAR' : legacyMembership)) as MembershipType | null,
     membershipAmountSatang: integer(row, 'membership_amount'),
     photoKey: text(row, 'photo_key'),
     photoSource: text(row, 'photo_source') as PhotoSource | null,

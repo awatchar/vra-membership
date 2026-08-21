@@ -380,13 +380,15 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async setMembership(id, type, amountSatang) {
+      const legacyType = type === 'FIVE_YEAR' ? 'ANNUAL' : type;
       await run(
         db
           .prepare(
-            `update applications set membership_type = ?, membership_amount = ?, updated_at = ?
+            `update applications set membership_type = ?, membership_term = ?,
+               membership_amount = ?, updated_at = ?
              where id = ?`,
           )
-          .bind(type, amountSatang, isoNow(now), id),
+          .bind(legacyType, type, amountSatang, isoNow(now), id),
       );
     },
 

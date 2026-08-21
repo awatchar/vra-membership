@@ -37,5 +37,5 @@ export async function seedApplication(
   return application.id;
 }
 
-export const ANNUAL_SATANG = 50_000;
+export const FIVE_YEAR_SATANG = 50_000;
 export const LIFETIME_SATANG = 200_000;

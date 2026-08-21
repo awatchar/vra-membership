@@ -22,7 +22,12 @@ import {
   TEST_ISSUER,
 } from '../support/access';
 import type { AccessKeyPair } from '../support/access';
-import { ANNUAL_SATANG, TEST_CITIZEN_ID, repository, seedApplication } from '../support/fixtures';
+import {
+  FIVE_YEAR_SATANG,
+  TEST_CITIZEN_ID,
+  repository,
+  seedApplication,
+} from '../support/fixtures';
 
 /**
  * Admin endpoints end to end, with **real** Cloudflare Access verification.
@@ -90,7 +95,7 @@ function paymentInput(applicationId: string): PaymentInput {
     applicationId,
     provider: 'slipok',
     transactionRef: `TXN-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: '002',
     receivingBank: 'ธนาคารตัวอย่าง',
     receiverAccountDigits: '1234',
@@ -120,7 +125,7 @@ async function notifiedApplication(repo: Repository, citizenId?: string): Promis
     mailPostcode: null,
     mailPhone: null,
   });
-  await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+  await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
   await repo.applications.setReferenceNo(id, `VRA-2569-${crypto.randomUUID().slice(0, 6)}`);
   await repo.payments.create(paymentInput(id));
 
@@ -501,7 +506,7 @@ describe('the application detail', () => {
     }>();
 
     expect(body.detail.application.email).toBe(APPLICANT_EMAIL);
-    expect(body.detail.application.membershipLabel).toBe('สมาชิกสามัญรายปี');
+    expect(body.detail.application.membershipLabel).toBe('สมาชิกสามัญราย 5 ปี');
     expect(body.detail.address?.idProvince).toBe('จังหวัดทดสอบ');
     expect(body.detail.payment?.transactionRef).toMatch(/^TXN-/);
     expect(body.detail.events.length).toBeGreaterThan(0);
@@ -770,7 +775,7 @@ describe('admin finalize', () => {
     const repo = repository();
     const id = await seedApplication(repo);
     await repo.applications.updateContact(id, { email: APPLICANT_EMAIL });
-    await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
     await repo.payments.create(paymentInput(id));
     const machine = createStateMachine(repo);
     await machine.transition(id, 'AWAITING_PAYMENT');

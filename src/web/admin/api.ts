@@ -52,7 +52,7 @@ export interface AdminListItem {
   referenceNo: string | null;
   status: ApplicationStatus;
   name: string | null;
-  membershipType: 'ANNUAL' | 'LIFETIME' | null;
+  membershipType: 'FIVE_YEAR' | 'LIFETIME' | null;
   amountBaht: string | null;
   submittedAt: string | null;
   createdAt: string;
@@ -100,7 +100,7 @@ export interface AdminDetail {
     phone: string | null;
     email: string | null;
     callsign: string | null;
-    membershipType: 'ANNUAL' | 'LIFETIME' | null;
+    membershipType: 'FIVE_YEAR' | 'LIFETIME' | null;
     membershipLabel: string | null;
     amountBaht: string | null;
     hasPhoto: boolean;

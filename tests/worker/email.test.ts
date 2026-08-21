@@ -11,7 +11,7 @@ import { createNumberingService } from '../../src/worker/services/numbering';
 import { createReceiptService } from '../../src/worker/services/receipt';
 import { createStateMachine } from '../../src/worker/services/state-machine';
 import {
-  ANNUAL_SATANG,
+  FIVE_YEAR_SATANG,
   TEST_CITIZEN_ID,
   TEST_KEY,
   repository,
@@ -58,7 +58,7 @@ function paymentInput(applicationId: string): PaymentInput {
     applicationId,
     provider: 'slipok',
     transactionRef: `TXN-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: '002',
     receivingBank: 'ธนาคารตัวอย่าง',
     receiverAccountDigits: '7890',
@@ -95,7 +95,7 @@ async function paidApplication(
     mailPostcode: null,
     mailPhone: null,
   });
-  await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+  await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
   await repo.applications.setReferenceNo(id, 'VRA-2569-000123');
   await repo.payments.create(paymentInput(id));
 
@@ -144,7 +144,7 @@ describe('receipt email', () => {
     await emails.sendReceipt(id);
     const sent = provider.sent.at(-1)!;
 
-    for (const expected of ['500.00 บาท', 'สมาชิกสามัญรายปี', 'ขั้นตอนต่อไป', 'กสทช.']) {
+    for (const expected of ['500.00 บาท', 'สมาชิกสามัญราย 5 ปี', 'ขั้นตอนต่อไป', 'กสทช.']) {
       expect(sent.text).toContain(expected);
       expect(sent.html).toContain(expected);
     }
@@ -207,7 +207,7 @@ describe('manager email', () => {
       APPLICANT_EMAIL,
       '0800000000',
       'HS0TEST',
-      'สมาชิกสามัญรายปี',
+      'สมาชิกสามัญราย 5 ปี',
       '500.00 บาท',
     ]) {
       expect(sent.text).toContain(expected);

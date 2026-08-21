@@ -30,10 +30,10 @@ interface Plan {
  */
 const PLANS: readonly Plan[] = [
   {
-    type: 'ANNUAL',
-    label: 'สมาชิกสามัญรายปี',
+    type: 'FIVE_YEAR',
+    label: 'สมาชิกสามัญราย 5 ปี',
     price: '500 บาท',
-    detail: 'ต่ออายุทุกปี',
+    detail: 'อายุสมาชิก 5 ปี',
   },
   {
     type: 'LIFETIME',

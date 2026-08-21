@@ -16,6 +16,10 @@ Cloudflare D1 migrations for the membership database. `wrangler.jsonc` points
 - `0005_add_retention_state.sql` adds the PII-erasure marker, time-bounded
   legal/investigation hold and the index used by the daily production retention
   Cron. Change it only with a new forward migration after it reaches production.
+- `0006_add_five_year_membership_term.sql` adds the canonical constrained
+  membership term and migrates legacy `ANNUAL` rows to `FIVE_YEAR`. The old
+  column remains only as a compatibility mirror so the parent table and its
+  foreign-key children never need a destructive SQLite rebuild.
 
 ## Commands
 

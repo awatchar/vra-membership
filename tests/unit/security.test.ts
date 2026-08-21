@@ -270,7 +270,7 @@ describe('assertCsrfProtected', () => {
 
 const applicantSchema = z
   .object({
-    membershipType: z.enum(['ANNUAL', 'LIFETIME']),
+    membershipType: z.enum(['FIVE_YEAR', 'LIFETIME']),
     email: z.string().email(),
     postcode: z.string().regex(/^\d{5}$/),
   })
@@ -280,12 +280,12 @@ describe('parseWithSchema', () => {
   it('returns the parsed value', () => {
     expect(
       parseWithSchema(applicantSchema, {
-        membershipType: 'ANNUAL',
+        membershipType: 'FIVE_YEAR',
         email: 'member@example.test',
         postcode: '10200',
       }),
     ).toEqual({
-      membershipType: 'ANNUAL',
+      membershipType: 'FIVE_YEAR',
       email: 'member@example.test',
       postcode: '10200',
     });
@@ -297,7 +297,7 @@ describe('parseWithSchema', () => {
     const error = (() => {
       try {
         parseWithSchema(applicantSchema, {
-          membershipType: 'ANNUAL',
+          membershipType: 'FIVE_YEAR',
           email: 'member@example.test',
           postcode: '10200',
           amount: 1,
@@ -357,7 +357,7 @@ describe('parseWithSchema', () => {
   it('reports one error per field, not one per rule', () => {
     const error = (() => {
       try {
-        parseWithSchema(applicantSchema, { membershipType: 'ANNUAL', email: 1, postcode: 1 });
+        parseWithSchema(applicantSchema, { membershipType: 'FIVE_YEAR', email: 1, postcode: 1 });
         return null;
       } catch (reason) {
         return reason as ValidationError;
@@ -392,7 +392,7 @@ describe('parseJsonBody', () => {
   });
 
   it('rejects a non-JSON content type', async () => {
-    const request = jsonRequest('membershipType=ANNUAL', 'application/x-www-form-urlencoded');
+    const request = jsonRequest('membershipType=FIVE_YEAR', 'application/x-www-form-urlencoded');
 
     const error = await parseJsonBody(request, applicantSchema).catch((reason: unknown) => reason);
     expect((error as ApiError).code).toBe('UNSUPPORTED_MEDIA_TYPE');
@@ -410,7 +410,7 @@ describe('parseJsonBody', () => {
   it('accepts a content type with a charset parameter', async () => {
     const request = jsonRequest(
       JSON.stringify({
-        membershipType: 'ANNUAL',
+        membershipType: 'FIVE_YEAR',
         email: 'member@example.test',
         postcode: '10200',
       }),

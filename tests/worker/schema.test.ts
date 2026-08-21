@@ -248,12 +248,20 @@ describe('value constraints', () => {
     ).rejects.toThrow(/CHECK/i);
   });
 
-  it('rejects an unknown membership type', async () => {
+  it('accepts the five-year term and rejects an unknown canonical membership type', async () => {
     const repo = repository();
     const applicationId = await seedApplication(repo);
 
     await expect(
-      env.DB.prepare('update applications set membership_type = ? where id = ?')
+      repo.applications.setMembership(applicationId, 'FIVE_YEAR', 50_000),
+    ).resolves.toBeUndefined();
+    await expect(repo.applications.findById(applicationId)).resolves.toMatchObject({
+      membershipType: 'FIVE_YEAR',
+      membershipAmountSatang: 50_000,
+    });
+
+    await expect(
+      env.DB.prepare('update applications set membership_term = ? where id = ?')
         .bind('MONTHLY', applicationId)
         .run(),
     ).rejects.toThrow(/CHECK/i);

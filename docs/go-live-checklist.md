@@ -31,15 +31,15 @@ Production URL: `https://member.vra.or.th`
 - [ ] SlipOK branch endpoint ใช้ branch id ถูกต้อง
 - [ ] SlipOK ตรวจ valid/wrong amount/wrong receiver/duplicate/provider error โดยไม่ persist image
 - [ ] Receiver masking ของธนาคารจริงมีเลขที่ตรวจได้อย่างน้อย 4 หลัก หรือ fail เป็น `RECEIVER_UNVERIFIABLE`
-- [ ] PromptPay QR สแกนแล้วปลายทางและยอด ANNUAL/LIFETIME ถูกต้อง
+- [ ] PromptPay QR สแกนแล้วปลายทางและยอด FIVE_YEAR/LIFETIME ถูกต้อง
 - [ ] รูป crop จาก mobile browser อยู่ใน tolerance 0.02 และ 300x400 พิมพ์ได้จริง
 
-## Scenario A — ANNUAL 500 THB
+## Scenario A — สมาชิกสามัญราย 5 ปี 500 THB
 
 - [ ] อ่าน notice, OCR/manual fallback, ตรวจและแก้ข้อมูล
 - [ ] เลือกรูปจากบัตรหรือ upload ใหม่ด้วย explicit selection
 - [ ] กรอกที่อยู่จัดส่งและ postcode โดยไม่เดาจาก OCR
-- [ ] Backend resolve `ANNUAL=500.00`; client amount ไม่ถูกเชื่อ
+- [ ] Backend resolve `FIVE_YEAR=500.00`; client amount ไม่ถูกเชื่อ
 - [ ] ตรวจ payment, receiver และ duplicate ผ่าน; รูปสลิปไม่ถูกเก็บ
 - [ ] สถานะไป `PAYMENT_VERIFIED`; ออกเลข/receipt PDF ภาษาไทย
 - [ ] ส่ง receipt ให้สมาชิกและใบสมัครให้ผู้จัดการ
@@ -61,7 +61,7 @@ Production URL: `https://member.vra.or.th`
 - [ ] Only the selected member photo is stored in private R2
 - [ ] Admin is protected by Cloudflare Access and authenticated POST
 - [ ] Provider/API keys never reach the browser, repository, logs or artifacts
-- [ ] Annual/lifetime amounts, receiver and duplicate transaction checks pass
+- [ ] Five-year/lifetime amounts, receiver and duplicate transaction checks pass
 - [ ] Receipt, manager, processing and completion emails pass with idempotency
 - [ ] Webhook signature/replay/idempotency checks pass
 - [ ] Application/receipt numbering remains unique under concurrency

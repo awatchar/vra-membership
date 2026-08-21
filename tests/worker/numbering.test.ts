@@ -10,7 +10,7 @@ import {
   parseSequence,
 } from '../../src/worker/services/numbering';
 import {
-  ANNUAL_SATANG,
+  FIVE_YEAR_SATANG,
   OTHER_TEST_CITIZEN_ID,
   repository,
   seedApplication,
@@ -31,7 +31,7 @@ function paymentInput(applicationId: string): PaymentInput {
     applicationId,
     provider: 'slipok',
     transactionRef: `REF-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: null,
     receivingBank: null,
     receiverAccountDigits: null,
@@ -240,7 +240,7 @@ describe('receipt numbers', () => {
         applicationId,
         paymentId,
         receiptNo,
-        amountSatang: ANNUAL_SATANG,
+        amountSatang: FIVE_YEAR_SATANG,
         issuedAt: IN_2569.toISOString(),
       }),
     );
@@ -260,7 +260,7 @@ describe('receipt numbers', () => {
           applicationId,
           paymentId,
           receiptNo,
-          amountSatang: ANNUAL_SATANG,
+          amountSatang: FIVE_YEAR_SATANG,
           issuedAt: IN_2569.toISOString(),
         }),
       );
@@ -290,7 +290,7 @@ describe('receipt numbers', () => {
             applicationId,
             paymentId,
             receiptNo,
-            amountSatang: ANNUAL_SATANG,
+            amountSatang: FIVE_YEAR_SATANG,
             issuedAt: IN_2569.toISOString(),
           }),
         ),
@@ -312,7 +312,7 @@ describe('receipt numbers', () => {
         applicationId: first.applicationId,
         paymentId: first.paymentId,
         receiptNo,
-        amountSatang: ANNUAL_SATANG,
+        amountSatang: FIVE_YEAR_SATANG,
         issuedAt: IN_2569.toISOString(),
       }),
     );
@@ -324,7 +324,7 @@ describe('receipt numbers', () => {
         applicationId: second.applicationId,
         paymentId: second.paymentId,
         receiptNo,
-        amountSatang: ANNUAL_SATANG,
+        amountSatang: FIVE_YEAR_SATANG,
         issuedAt: IN_2570.toISOString(),
       }),
     );
@@ -342,7 +342,7 @@ describe('receipt numbers', () => {
         applicationId,
         paymentId,
         receiptNo,
-        amountSatang: ANNUAL_SATANG,
+        amountSatang: FIVE_YEAR_SATANG,
         issuedAt: IN_2569.toISOString(),
       });
 
