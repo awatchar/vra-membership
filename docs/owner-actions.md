@@ -50,24 +50,24 @@ pwsh -File ./scripts/set-production-secrets.ps1
 
 ## 2. Cloudflare — การตั้งค่าอื่น
 
-- [ ] **Turnstile site** — สร้าง widget แล้วใส่ **ทั้งสองค่า** ในข้อ 1: `TURNSTILE_SECRET_KEY` และ `TURNSTILE_SITE_KEY`
+- [x] **Turnstile site** — สร้าง widget แล้วใส่ **ทั้งสองค่า** ในข้อ 1: `TURNSTILE_SECRET_KEY` และ `TURNSTILE_SITE_KEY`
       site key เป็นค่าสาธารณะ แต่เก็บเป็น secret เหมือนกันเพราะ Worker ส่งให้ browser ผ่าน `GET /api/config` ตอน runtime — ทำให้เปลี่ยน widget ได้โดยไม่ต้อง rebuild และ CI ไม่ต้องรู้ค่านี้เลย
       **ถ้าไม่ตั้ง `TURNSTILE_SITE_KEY`** browser จะไม่แสดง widget และไม่ส่ง token ซึ่งปลอดภัยเพราะฝั่ง server เป็นคนตัดสิน: `PROVIDER_MODE=live` ต้องมี secret และปฏิเสธคำขอที่ไม่มี token
 - [ ] **Custom domain** — ผูก `member.vra.or.th` เข้ากับ Worker `vra-membership` (`wrangler.jsonc` ประกาศ route ไว้แล้ว จะถูกสร้างตอน deploy ครั้งแรก แต่ DNS ต้องพร้อม)
-- [ ] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) แล้วคัดลอก **AUD tag** จากหน้า Overview ของ application ไปใส่ `CF_ACCESS_AUD` และ team domain ไปใส่ `CF_ACCESS_TEAM_DOMAIN` ในข้อ 1
+- [x] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) แล้วคัดลอก **AUD tag** จากหน้า Overview ของ application ไปใส่ `CF_ACCESS_AUD` และ team domain ไปใส่ `CF_ACCESS_TEAM_DOMAIN` ในข้อ 1
       Worker ตรวจ JWT เองอีกชั้นด้วย ดังนั้น **ถ้าสอง secret นี้ยังไม่ได้ตั้ง ทุก admin endpoint จะปฏิเสธทุกคำขอ** ซึ่งเป็นพฤติกรรมที่ต้องการ — ไม่มีสถานะ "ยังไม่ตั้งค่าแล้วเข้าได้เลย"
-- [ ] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
-- [ ] **Resend — endpoint ของ webhook** — เพิ่ม endpoint `https://member.vra.or.th/api/webhooks/resend` แล้วเลือก event `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced` จากนั้นคัดลอก signing secret ไปใส่ `RESEND_WEBHOOK_SECRET` ในข้อ 1
+- [x] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
+- [x] **Resend — sending domain และ webhook** — verify `member.vra.or.th` ใน region Tokyo แล้ว เพิ่ม endpoint `https://member.vra.or.th/api/webhooks/resend` พร้อม event `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced` และเก็บ signing secret ใน Worker แล้ว
       ระบบตอบ 2xx ให้ event ที่ไม่ได้เลือกด้วย จึงเลือกเพิ่มได้โดยไม่พัง แต่ **การเปลี่ยนสถานะใบสมัครอาศัย `email.opened`** ถ้าไม่เลือก ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" เอง
 - [ ] **Resend — open tracking แยก sender (ไม่บังคับ)** — Resend เปิด open tracking ที่ระดับ domain ไม่มี field ต่อ message ถ้าเปิดบน domain ที่ส่งอีเมลสมาชิก อีเมลสมาชิกจะถูก track ด้วย ซึ่งขัดกับข้อกำหนดที่ให้ track เฉพาะอีเมลผู้จัดการ วิธีที่ตรงตามข้อกำหนดคือ verify subdomain แยก (เช่น `notify.vra.or.th`) เปิด open tracking บน subdomain นั้น แล้วใส่เป็น `EMAIL_FROM_TRACKED`
       **ถ้าไม่ทำ** ระบบยังทำงานครบ เพียงแต่การที่ผู้จัดการเปิดอีเมลจะไม่ขยับสถานะใบสมัครเอง ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" ซึ่งมีอยู่ในอีเมลและในระบบผู้จัดการแล้ว
-- [ ] **API token สำหรับ CI** — สร้างแบบ least privilege: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้ ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning
+- [x] **API token สำหรับ CI** — สร้างแบบ least privilege: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้ ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning
 
 ---
 
 ## 3. GitHub
 
-- [ ] เพิ่ม environment secrets บน environment `production`: `CLOUDFLARE_API_TOKEN` และ `CLOUDFLARE_ACCOUNT_ID`
+- [x] เพิ่ม environment secrets บน environment `production`: `CLOUDFLARE_API_TOKEN` และ `CLOUDFLARE_ACCOUNT_ID`
 - [ ] ตั้ง repository variable `CLOUDFLARE_DEPLOY_ENABLED=true` เมื่อข้อ 1 และ 2 เสร็จ ก่อนหน้านั้น job `deploy` จะข้ามขั้นตอน deploy และเขียนสรุปว่ายังไม่เปิด delivery
 - [ ] **GitHub Support request** เพื่อ purge PII ที่ยังเข้าถึงได้ผ่าน commit SHA เดิม — รายละเอียดใน [#21](https://github.com/awatchar/vra-membership/issues/21)
 

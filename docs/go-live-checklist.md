@@ -11,15 +11,15 @@ Production URL: `https://member.vra.or.th`
 - [ ] Privacy notice ผ่าน human sign-off ตาม `docs/privacy-notice.md`
 - [ ] Retention policy ผ่าน human sign-off และ migration/Cron deploy แล้ว
 - [ ] APAC data location ได้รับการยอมรับก่อนมีข้อมูลจริง
-- [ ] Cloudflare production secrets ครบ และ `PROVIDER_MODE=live`
+- [x] Cloudflare production secrets ครบ และ `PROVIDER_MODE=live`
 - [ ] GitHub production environment มี CI token/account id, delivery variableเปิด และ reviewer อนุมัติ deploy
 - [ ] Custom domain, TLS และ DNS พร้อม
-- [ ] Cloudflare Access ครอบ `/admin*` และ `/api/admin/*`; ผู้ไม่ได้รับอนุญาตเข้าไม่ได้
-- [ ] Turnstile แสดงและ server-side verification fail closed
-- [ ] R2 `vra-member-private` ปิด `r2.dev` และไม่มี custom domain
-- [ ] Edge rate-limit rules ครอบ OCR, payment verify และ member photo
-- [ ] Resend domain/webhook พร้อมและ signature verification ผ่าน
-- [ ] CI quality gates และ production config dry-run ผ่านบน commit ที่ deploy
+- [x] Cloudflare Access ครอบ `/admin*` และ `/api/admin/*`; policy อนุญาตเฉพาะ owner-approved identities
+- [x] Turnstile production widget จำกัด hostname และ server-side verification fail closed
+- [x] R2 `vra-member-private` ปิด `r2.dev` และไม่มี custom domain
+- [x] Edge rate-limit rules ครอบ OCR, payment verify และ member photo
+- [x] Resend sending domain verify แล้ว, webhook เปิดใช้ และ signing secret อยู่ใน Worker
+- [x] CI quality gates และ production config dry-run ผ่านบน release candidate
 - [ ] `/api/health` ได้ HTTP 200, production/live และมี `CF-Connecting-IP` ใน request จริง
 - [ ] Security headers/CSP/HSTS/no-store ตรวจบน HTML, assets, API และ admin deep link
 - [ ] Logs/CI artifacts ไม่มี PII หรือ secret

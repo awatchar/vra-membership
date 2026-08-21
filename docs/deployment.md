@@ -50,19 +50,24 @@ Pipeline ประกอบด้วยสาม workflow
 
    หรือตั้งทีละตัวด้วย `wrangler secret put <NAME> --env production`
 
-   | Secret                  | ใช้ทำอะไร                         |
-   | ----------------------- | --------------------------------- |
-   | `IAPP_API_KEY`          | iApp Thai national ID OCR         |
-   | `SLIPOK_API_KEY`        | SlipOK slip verification          |
-   | `RESEND_API_KEY`        | Resend transactional email        |
-   | `RESEND_WEBHOOK_SECRET` | ตรวจ signature ของ Resend webhook |
-   | `TURNSTILE_SECRET_KEY`  | ตรวจ Turnstile token ฝั่ง server  |
-   | `PII_ENCRYPTION_KEY`    | เข้ารหัสเลขบัตรประชาชนใน D1       |
-   | `MANAGER_EMAIL`         | ผู้รับ email แจ้งใบสมัครใหม่      |
-   | `EMAIL_FROM`            | sender ของ transactional email    |
-   | `VRA_BANK_NAME`         | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
-   | `VRA_BANK_ACCOUNT`      | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
-   | `VRA_BANK_ACCOUNT_NAME` | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
+   | Secret                  | ใช้ทำอะไร                                    |
+   | ----------------------- | -------------------------------------------- |
+   | `IAPP_API_KEY`          | iApp Thai national ID OCR                    |
+   | `SLIPOK_API_KEY`        | SlipOK slip verification                     |
+   | `SLIPOK_BRANCH_ID`      | branch id ใน SlipOK endpoint                 |
+   | `RESEND_API_KEY`        | Resend transactional email                   |
+   | `RESEND_WEBHOOK_SECRET` | ตรวจ signature ของ Resend webhook            |
+   | `TURNSTILE_SECRET_KEY`  | ตรวจ Turnstile token ฝั่ง server             |
+   | `TURNSTILE_SITE_KEY`    | site key ที่ Worker ส่งให้ browser           |
+   | `PII_ENCRYPTION_KEY`    | เข้ารหัสเลขบัตรประชาชนใน D1                  |
+   | `MANAGER_EMAIL`         | ผู้รับ email แจ้งใบสมัครใหม่                 |
+   | `EMAIL_FROM`            | sender ของ transactional email               |
+   | `EMAIL_FROM_TRACKED`    | optional sender สำหรับ manager open tracking |
+   | `VRA_BANK_NAME`         | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `VRA_BANK_ACCOUNT`      | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `VRA_BANK_ACCOUNT_NAME` | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `CF_ACCESS_TEAM_DOMAIN` | team domain สำหรับตรวจ Access JWT            |
+   | `CF_ACCESS_AUD`         | audience tag สำหรับตรวจ Access JWT           |
 
    `PII_ENCRYPTION_KEY` ต้องเป็นค่าสุ่มความยาวอย่างน้อย 32 bytes สร้างด้วย
 
