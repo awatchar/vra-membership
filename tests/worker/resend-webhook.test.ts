@@ -8,7 +8,7 @@ import { createNumberingService } from '../../src/worker/services/numbering';
 import { createReceiptService } from '../../src/worker/services/receipt';
 import { createStateMachine } from '../../src/worker/services/state-machine';
 import { createMockEmailProvider } from '../../src/worker/providers/mock/email';
-import { ANNUAL_SATANG, repository, seedApplication } from '../support/fixtures';
+import { FIVE_YEAR_SATANG, repository, seedApplication } from '../support/fixtures';
 
 /**
  * The webhook is a public endpoint that can change an application's status, so
@@ -81,7 +81,7 @@ function paymentInput(applicationId: string): PaymentInput {
     applicationId,
     provider: 'slipok',
     transactionRef: `TXN-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: '002',
     receivingBank: 'ธนาคารตัวอย่าง',
     receiverAccountDigits: '7890',
@@ -103,7 +103,7 @@ async function notifiedApplication(
 ): Promise<{ applicationId: string; email: EmailRecord }> {
   const applicationId = await seedApplication(repo);
   await repo.applications.updateContact(applicationId, { email: APPLICANT_EMAIL });
-  await repo.applications.setMembership(applicationId, 'ANNUAL', ANNUAL_SATANG);
+  await repo.applications.setMembership(applicationId, 'FIVE_YEAR', FIVE_YEAR_SATANG);
   await repo.applications.setReferenceNo(
     applicationId,
     `VRA-2569-${crypto.randomUUID().slice(0, 6)}`,

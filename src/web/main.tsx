@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AdminApp } from './admin/AdminApp';
+import { PrivacyNotice } from './privacy/PrivacyNotice';
 import './styles/global.css';
 import './styles/wizard.css';
 import './styles/admin.css';
@@ -28,5 +29,8 @@ if (!container) {
 const isAdmin =
   window.location.pathname.replace(/\/+$/, '') === '/admin' ||
   window.location.pathname.startsWith('/admin/');
+const isPrivacyNotice = window.location.pathname.replace(/\/+$/, '') === '/privacy';
 
-createRoot(container).render(<StrictMode>{isAdmin ? <AdminApp /> : <App />}</StrictMode>);
+createRoot(container).render(
+  <StrictMode>{isAdmin ? <AdminApp /> : isPrivacyNotice ? <PrivacyNotice /> : <App />}</StrictMode>,
+);

@@ -7,7 +7,12 @@ import { createStateMachine } from '../../src/worker/services/state-machine';
 import { createMockSlipProvider } from '../../src/worker/providers/mock/slip';
 import type { MockSlipOptions } from '../../src/worker/providers/mock/slip';
 import type { Repository } from '../../src/worker/db';
-import { ANNUAL_SATANG, LIFETIME_SATANG, repository, seedApplication } from '../support/fixtures';
+import {
+  FIVE_YEAR_SATANG,
+  LIFETIME_SATANG,
+  repository,
+  seedApplication,
+} from '../support/fixtures';
 
 /**
  * Payment verification against the real database.
@@ -54,13 +59,13 @@ function service(repo: Repository, slipOptions: MockSlipOptions = {}, now: () =>
 async function readyToPay(
   repo: Repository,
   citizenId?: string,
-  membership: 'ANNUAL' | 'LIFETIME' = 'ANNUAL',
+  membership: 'FIVE_YEAR' | 'LIFETIME' = 'FIVE_YEAR',
 ): Promise<string> {
   const id = await seedApplication(repo, citizenId);
   await repo.applications.setMembership(
     id,
     membership,
-    membership === 'ANNUAL' ? ANNUAL_SATANG : LIFETIME_SATANG,
+    membership === 'FIVE_YEAR' ? FIVE_YEAR_SATANG : LIFETIME_SATANG,
   );
   await createStateMachine(repo).transition(id, 'AWAITING_PAYMENT');
   return id;
@@ -69,13 +74,13 @@ async function readyToPay(
 const QR = { kind: 'qr', payload: 'mock-qr-payload' } as const;
 
 describe('accepting a valid payment', () => {
-  it('verifies an annual payment and moves the application on', async () => {
+  it('verifies a five-year payment and moves the application on', async () => {
     const repo = repository();
     const id = await readyToPay(repo);
 
     const verified = await service(repo).verify({ applicationId: id, evidence: QR });
 
-    expect(verified.amountSatang).toBe(ANNUAL_SATANG);
+    expect(verified.amountSatang).toBe(FIVE_YEAR_SATANG);
     await expect(repo.applications.findById(id)).resolves.toMatchObject({
       status: 'PAYMENT_VERIFIED',
     });
@@ -139,7 +144,7 @@ describe('the amount check', () => {
     const repo = repository();
     const id = await readyToPay(repo);
 
-    // The applicant selected ANNUAL but transferred the lifetime amount.
+    // The applicant selected FIVE_YEAR but transferred the lifetime amount.
     const error = await service(repo, {
       transaction: { amount: LIFETIME_SATANG, receiverAccountDigits: '7890' },
     })
@@ -155,7 +160,7 @@ describe('the amount check', () => {
     const id = await readyToPay(repo);
 
     const error = await service(repo, {
-      transaction: { amount: ANNUAL_SATANG - 1, receiverAccountDigits: '7890' },
+      transaction: { amount: FIVE_YEAR_SATANG - 1, receiverAccountDigits: '7890' },
     })
       .verify({ applicationId: id, evidence: QR })
       .catch((reason: unknown) => reason);
@@ -469,7 +474,7 @@ describe('a payment that is not expected', () => {
     const repo = repository();
     // Still a draft: the applicant has not reached the payment step.
     const id = await seedApplication(repo);
-    await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
 
     const error = await service(repo)
       .verify({ applicationId: id, evidence: QR })

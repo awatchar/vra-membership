@@ -15,7 +15,12 @@ import { createEmailService } from '../../src/worker/services/email';
 import { createNumberingService } from '../../src/worker/services/numbering';
 import { createReceiptService } from '../../src/worker/services/receipt';
 import { createStateMachine } from '../../src/worker/services/state-machine';
-import { ANNUAL_SATANG, LIFETIME_SATANG, repository, seedApplication } from '../support/fixtures';
+import {
+  FIVE_YEAR_SATANG,
+  LIFETIME_SATANG,
+  repository,
+  seedApplication,
+} from '../support/fixtures';
 
 /**
  * The post-payment sequence (Issue #1 section 28), end to end inside the worker.
@@ -83,10 +88,10 @@ function paymentInput(applicationId: string, amountSatang: number): PaymentInput
 /** An application in `PAYMENT_VERIFIED`, which is where this workflow starts. */
 async function paidApplication(
   repo: Repository,
-  membership: MembershipType = 'ANNUAL',
+  membership: MembershipType = 'FIVE_YEAR',
   citizenId?: string,
 ): Promise<string> {
-  const amount = membership === 'ANNUAL' ? ANNUAL_SATANG : LIFETIME_SATANG;
+  const amount = membership === 'FIVE_YEAR' ? FIVE_YEAR_SATANG : LIFETIME_SATANG;
   const id = await seedApplication(repo, citizenId);
   await repo.applications.updateContact(id, { email: APPLICANT_EMAIL, phone: '0800000000' });
   await repo.applications.setMembership(id, membership, amount);
@@ -105,10 +110,10 @@ function eventTypes(events: readonly { eventType: string }[]): string[] {
 }
 
 describe('the happy path', () => {
-  it('carries an annual application all the way to the manager', async () => {
+  it('carries a five-year application all the way to the manager', async () => {
     const repo = repository();
     const { workflow, provider } = harness(repo);
-    const id = await paidApplication(repo, 'ANNUAL');
+    const id = await paidApplication(repo, 'FIVE_YEAR');
 
     const report = await workflow.resume(id);
 
@@ -252,7 +257,7 @@ describe('running it again', () => {
   it('numbers two applications without collision', async () => {
     const repo = repository();
     const { workflow } = harness(repo);
-    const first = await paidApplication(repo, 'ANNUAL', '1234567890121');
+    const first = await paidApplication(repo, 'FIVE_YEAR', '1234567890121');
     const second = await paidApplication(repo, 'LIFETIME', '1234567890139');
 
     const a = await workflow.resume(first);
@@ -449,7 +454,7 @@ async function readyToPay(repo: Repository, citizenId: string) {
       body: JSON.stringify({ email: APPLICANT_EMAIL, phone: '0800000000' }),
     }),
   );
-  await repo.applications.setMembership(id, 'ANNUAL', ANNUAL_SATANG);
+  await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
   await createStateMachine(repo).transition(id, 'AWAITING_PAYMENT');
 
   return { id, token: created.accessToken };

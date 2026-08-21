@@ -415,18 +415,18 @@ describe('PATCH /api/applications/:id', () => {
   it('records the membership choice in the audit trail', async () => {
     const created = await createApplication();
     await exports.default.fetch(
-      patchRequest(created.application.id, created.accessToken, { membershipType: 'ANNUAL' }),
+      patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
     );
 
     const events = await repository().events.listByApplicationId(created.application.id);
     const selected = events.find((event) => event.eventType === 'MEMBERSHIP_SELECTED');
-    expect(selected?.metadata).toMatchObject({ membershipType: 'ANNUAL', amountSatang: 50_000 });
+    expect(selected?.metadata).toMatchObject({ membershipType: 'FIVE_YEAR', amountSatang: 50_000 });
   });
 });
 
 describe('membership catalogue', () => {
   it('prices the two plans as specified', () => {
-    expect(membershipPlan('ANNUAL').amountSatang).toBe(50_000);
+    expect(membershipPlan('FIVE_YEAR').amountSatang).toBe(50_000);
     expect(membershipPlan('LIFETIME').amountSatang).toBe(200_000);
   });
 

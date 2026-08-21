@@ -4,7 +4,7 @@ import { UniqueConstraintError } from '../../src/worker/db';
 import type { PaymentInput } from '../../src/worker/db';
 import { createCitizenIdProtection } from '../../src/worker/lib/crypto';
 import {
-  ANNUAL_SATANG,
+  FIVE_YEAR_SATANG,
   LIFETIME_SATANG,
   OTHER_TEST_CITIZEN_ID,
   repository,
@@ -18,7 +18,7 @@ function paymentInput(applicationId: string, overrides: Partial<PaymentInput> = 
     applicationId,
     provider: 'slipok',
     transactionRef: `REF-${crypto.randomUUID()}`,
-    amountSatang: ANNUAL_SATANG,
+    amountSatang: FIVE_YEAR_SATANG,
     sendingBank: 'BBL',
     receivingBank: 'KBANK',
     receiverAccountDigits: '1234',
@@ -384,7 +384,7 @@ describe('payments', () => {
 
     const payment = await repo.payments.create(paymentInput(id));
 
-    expect(payment.amountSatang).toBe(ANNUAL_SATANG);
+    expect(payment.amountSatang).toBe(FIVE_YEAR_SATANG);
     expect(payment.receiverMatched).toBe(true);
     expect(payment.verificationStatus).toBe('VERIFIED');
   });
@@ -454,7 +454,7 @@ describe('receipts', () => {
       applicationId,
       paymentId,
       receiptNo: 'VRA-RC-2569-000091',
-      amountSatang: ANNUAL_SATANG,
+      amountSatang: FIVE_YEAR_SATANG,
       issuedAt: '2026-02-03T04:05:06.000Z',
     });
 
@@ -469,7 +469,7 @@ describe('receipts', () => {
       applicationId,
       paymentId,
       receiptNo: 'VRA-RC-2569-000092',
-      amountSatang: ANNUAL_SATANG,
+      amountSatang: FIVE_YEAR_SATANG,
       issuedAt: '2026-02-03T04:05:06.000Z',
     });
 
@@ -488,7 +488,7 @@ describe('receipts', () => {
       applicationId,
       paymentId,
       receiptNo: 'VRA-RC-2569-000093',
-      amountSatang: ANNUAL_SATANG,
+      amountSatang: FIVE_YEAR_SATANG,
       issuedAt: '2026-02-03T04:05:06.000Z',
     });
 
@@ -497,7 +497,7 @@ describe('receipts', () => {
         applicationId,
         paymentId,
         receiptNo: 'VRA-RC-2569-000094',
-        amountSatang: ANNUAL_SATANG,
+        amountSatang: FIVE_YEAR_SATANG,
         issuedAt: '2026-02-03T04:05:06.000Z',
       }),
     ).rejects.toBeInstanceOf(UniqueConstraintError);
@@ -654,7 +654,7 @@ describe('audit events', () => {
       applicationId,
       eventType: 'PAYMENT_VERIFIED',
       actorType: 'SYSTEM',
-      metadata: { amountSatang: ANNUAL_SATANG },
+      metadata: { amountSatang: FIVE_YEAR_SATANG },
     });
 
     const events = await repo.events.listByApplicationId(applicationId);
@@ -662,7 +662,7 @@ describe('audit events', () => {
       'APPLICATION_CREATED',
       'PAYMENT_VERIFIED',
     ]);
-    expect(events[1]!.metadata).toEqual({ amountSatang: ANNUAL_SATANG });
+    expect(events[1]!.metadata).toEqual({ amountSatang: FIVE_YEAR_SATANG });
   });
 
   it('drops metadata values that are not primitives', async () => {

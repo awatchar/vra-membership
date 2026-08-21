@@ -9,6 +9,7 @@ import { createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
 import { withSecurityHeaders } from './security/headers';
 import { PaymentRejectedError } from './services/payment';
+import { runRetention } from './services/retention';
 import { healthRoutes } from './routes/health';
 import { adminRoutes } from './routes/admin';
 import { applicationRoutes } from './routes/applications';
@@ -173,4 +174,27 @@ app.onError((error, c) => {
   return c.json(errorBody('INTERNAL_ERROR', GENERIC_ERROR_MESSAGE, requestId), 500);
 });
 
-export default app;
+export default {
+  fetch(request: Request, env: Cloudflare.Env, context: ExecutionContext) {
+    return app.fetch(request, env, context);
+  },
+  async scheduled(controller: ScheduledController, env: Cloudflare.Env) {
+    const config = readConfig(env as unknown as Record<string, unknown>);
+    const logger = createLogger({ level: config.ENVIRONMENT === 'production' ? 'info' : 'debug' });
+
+    try {
+      const result = await runRetention(env.DB, env.MEMBER_PHOTOS, {
+        now: new Date(controller.scheduledTime),
+      });
+      logger.info({ event: 'retention.abandoned_deleted', count: result.abandonedDeleted });
+      logger.info({ event: 'retention.pii_erased', count: result.piiErased });
+      logger.info({ event: 'retention.records_deleted', count: result.recordsDeleted });
+    } catch {
+      // Never log the error object: a storage/provider error may carry a key or
+      // query detail. A failed Cron invocation is retried operationally and the
+      // idempotent cleanup resumes from the remaining rows.
+      logger.error({ event: 'retention.failed', errorCode: 'RETENTION_FAILED' });
+      throw new Error('Retention run failed');
+    }
+  },
+} satisfies ExportedHandler<Cloudflare.Env>;

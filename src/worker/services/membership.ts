@@ -19,7 +19,11 @@ export interface MembershipPlan {
 }
 
 const PLANS: Readonly<Record<MembershipType, MembershipPlan>> = {
-  ANNUAL: { type: 'ANNUAL', amountSatang: 50_000, labelTh: 'สมาชิกสามัญรายปี' },
+  FIVE_YEAR: {
+    type: 'FIVE_YEAR',
+    amountSatang: 50_000,
+    labelTh: 'สมาชิกสามัญราย 5 ปี',
+  },
   LIFETIME: { type: 'LIFETIME', amountSatang: 200_000, labelTh: 'สมาชิกสามัญตลอดชีพ' },
 };
 

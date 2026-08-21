@@ -26,6 +26,8 @@
 
 ทุก PR ต้องระบุ security/privacy impact แม้คำตอบคือ “ไม่มี” พร้อมเหตุผลสั้น ๆ
 
+ระยะเก็บและกลไกลบ production อยู่ใน [retention policy](retention-policy.md) ส่วนข้อความที่แสดงต่อผู้สมัครและรายการ human review อยู่ใน [privacy notice](privacy-notice.md)
+
 ## Response headers
 
 `src/worker/security/headers.ts` ตั้ง header บนทุก response และ middleware อยู่ชั้นนอกสุดใน `src/worker/index.ts` จึงครอบทั้ง API, error และ static asset — policy ที่ครอบเฉพาะ path ที่มีคนจำได้ ไม่ใช่ policy

@@ -10,7 +10,7 @@ Pipeline ประกอบด้วยสาม workflow
 | [`ci.yml`](../.github/workflows/ci.yml)           | pull request, push `main`, manual | เรียก quality gates                                                   |
 | [`deploy.yml`](../.github/workflows/deploy.yml)   | push `main`, manual               | เรียก quality gates แล้ว deploy production                            |
 
-`deploy.yml` เรียก quality gates ชุดเดียวกับ CI และ job `deploy` มี `needs: quality` จึงไม่มีทางที่ commit จะขึ้น production โดยไม่ผ่าน gates เดียวกัน และใช้ GitHub environment ชื่อ `production` เพื่อบังคับ approval/secret scoping
+`deploy.yml` เรียก quality gates ชุดเดียวกับ CI แล้วตรวจ repository kill switch ใน job ที่ไม่ใช้ environment หาก delivery ปิด workflow จะจบโดยไม่ขอ approval หากเปิดแล้ว job `deploy` จึงเข้าสู่ GitHub environment `production` เพื่อบังคับ approval/secret scoping โครงสร้างนี้ป้องกัน run เก่าที่รอ approval กีดกัน push ใหม่โดยไม่จำเป็น
 
 ## One-time setup by the Cloudflare account owner
 
@@ -50,19 +50,24 @@ Pipeline ประกอบด้วยสาม workflow
 
    หรือตั้งทีละตัวด้วย `wrangler secret put <NAME> --env production`
 
-   | Secret                  | ใช้ทำอะไร                         |
-   | ----------------------- | --------------------------------- |
-   | `IAPP_API_KEY`          | iApp Thai national ID OCR         |
-   | `SLIPOK_API_KEY`        | SlipOK slip verification          |
-   | `RESEND_API_KEY`        | Resend transactional email        |
-   | `RESEND_WEBHOOK_SECRET` | ตรวจ signature ของ Resend webhook |
-   | `TURNSTILE_SECRET_KEY`  | ตรวจ Turnstile token ฝั่ง server  |
-   | `PII_ENCRYPTION_KEY`    | เข้ารหัสเลขบัตรประชาชนใน D1       |
-   | `MANAGER_EMAIL`         | ผู้รับ email แจ้งใบสมัครใหม่      |
-   | `EMAIL_FROM`            | sender ของ transactional email    |
-   | `VRA_BANK_NAME`         | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
-   | `VRA_BANK_ACCOUNT`      | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
-   | `VRA_BANK_ACCOUNT_NAME` | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป  |
+   | Secret                  | ใช้ทำอะไร                                    |
+   | ----------------------- | -------------------------------------------- |
+   | `IAPP_API_KEY`          | iApp Thai national ID OCR                    |
+   | `SLIPOK_API_KEY`        | SlipOK slip verification                     |
+   | `SLIPOK_BRANCH_ID`      | branch id ใน SlipOK endpoint                 |
+   | `RESEND_API_KEY`        | Resend transactional email                   |
+   | `RESEND_WEBHOOK_SECRET` | ตรวจ signature ของ Resend webhook            |
+   | `TURNSTILE_SECRET_KEY`  | ตรวจ Turnstile token ฝั่ง server             |
+   | `TURNSTILE_SITE_KEY`    | site key ที่ Worker ส่งให้ browser           |
+   | `PII_ENCRYPTION_KEY`    | เข้ารหัสเลขบัตรประชาชนใน D1                  |
+   | `MANAGER_EMAIL`         | ผู้รับ email แจ้งใบสมัครใหม่                 |
+   | `EMAIL_FROM`            | sender ของ transactional email               |
+   | `EMAIL_FROM_TRACKED`    | optional sender สำหรับ manager open tracking |
+   | `VRA_BANK_NAME`         | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `VRA_BANK_ACCOUNT`      | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `VRA_BANK_ACCOUNT_NAME` | แสดงบนหน้าชำระเงินและใช้ตรวจสลิป             |
+   | `CF_ACCESS_TEAM_DOMAIN` | team domain สำหรับตรวจ Access JWT            |
+   | `CF_ACCESS_AUD`         | audience tag สำหรับตรวจ Access JWT           |
 
    `PII_ENCRYPTION_KEY` ต้องเป็นค่าสุ่มความยาวอย่างน้อย 32 bytes สร้างด้วย
 
@@ -102,6 +107,8 @@ Pipeline ประกอบด้วยสาม workflow
 5. `wrangler deploy --env production`
 6. smoke test `GET https://member.vra.or.th/api/health` ต้องได้ HTTP 200 (endpoint นี้ไม่มี PII และไม่เรียก provider)
 7. บันทึก commit SHA และ URL ไว้ใน job summary
+
+8. Wrangler ติดตั้ง production Cron `17 19 * * *` UTC สำหรับ retention ตาม `docs/retention-policy.md`
 
 ## Rollback
 

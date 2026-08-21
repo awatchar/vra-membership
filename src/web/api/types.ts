@@ -7,7 +7,7 @@
  * in client code by accident.
  */
 
-export type MembershipType = 'ANNUAL' | 'LIFETIME';
+export type MembershipType = 'FIVE_YEAR' | 'LIFETIME';
 export type PhotoSource = 'ID_CARD' | 'UPLOAD';
 
 export interface PublicConfig {
