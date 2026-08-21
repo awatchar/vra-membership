@@ -172,8 +172,28 @@ describe('mock email provider', () => {
       text: 'test',
     });
 
-    expect(result).toEqual({ ok: true, providerEmailId: 'mock-email-1' });
+    expect(result.ok).toBe(true);
     expect(email.sent).toHaveLength(1);
+  });
+
+  it('returns a distinct id for every message, across instances', async () => {
+    const outbound = {
+      to: 'member@example.test',
+      subject: 'test',
+      html: '<p>test</p>',
+      text: 'test',
+    };
+    const first = await createMockEmailProvider().send(outbound);
+    const second = await createMockEmailProvider().send(outbound);
+
+    // `emails.provider_email_id` is unique. A per-instance counter restarting
+    // at 1 - one instance per request - collided across requests, which a real
+    // provider's globally unique ids never would.
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    expect((first as { providerEmailId: string }).providerEmailId).not.toBe(
+      (second as { providerEmailId: string }).providerEmailId,
+    );
   });
 
   it('can simulate a provider failure', async () => {

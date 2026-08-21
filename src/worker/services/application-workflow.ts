@@ -1,4 +1,5 @@
 import type { ApplicationRecord, EmailRecord, EmailType, Repository } from '../db';
+import { ApiError } from '../lib/http';
 import type { EmailOutcome, EmailService } from './email';
 import type { NumberingService } from './numbering';
 import type { ReceiptService } from './receipt';
@@ -63,11 +64,15 @@ export interface WorkflowReport {
 export const APPLICATION_SUBMITTED_EVENT = 'APPLICATION_SUBMITTED';
 export const MANAGER_NOTIFIED_EVENT = 'MANAGER_NOTIFIED';
 
-export class WorkflowApplicationNotFoundError extends Error {
-  constructor() {
-    super('ไม่พบใบสมัครนี้');
-    this.name = 'WorkflowApplicationNotFoundError';
-  }
+/**
+ * Thrown for an unknown application.
+ *
+ * An `ApiError` rather than a bespoke class so the entrypoint maps it to 404
+ * without a per-service branch - a custom error here surfaced as a 500 and told
+ * the caller nothing.
+ */
+export function workflowApplicationNotFound(): ApiError {
+  return new ApiError('NOT_FOUND', 'ไม่พบใบสมัครนี้');
 }
 
 export interface ApplicationWorkflow {
@@ -120,7 +125,7 @@ export function createApplicationWorkflow(
 ): ApplicationWorkflow {
   const load = async (applicationId: string): Promise<ApplicationRecord> => {
     const application = await db.applications.findById(applicationId);
-    if (!application) throw new WorkflowApplicationNotFoundError();
+    if (!application) throw workflowApplicationNotFound();
     return application;
   };
 

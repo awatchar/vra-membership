@@ -24,6 +24,7 @@ src/worker/            Cloudflare Worker (Hono)
   context.ts           Hono generics shared by every route
   routes/              HTTP routes
     webhooks.ts        provider callbacks; signature is the only authentication
+    admin.ts           manager endpoints, authenticated in the Worker itself
   db/                  data access layer; the only module that knows SQL
     types.ts           internal models and the status/type unions
     mappers.ts         row to model conversion
@@ -32,6 +33,7 @@ src/worker/            Cloudflare Worker (Hono)
   security/            controls applied before business rules run
     turnstile.ts       bot protection, verified before any provider call
     rate-limit.ts      fixed-window counters in D1, hashed identifiers
+    access.ts          Cloudflare Access JWT verification, done again here
     csrf.ts            origin check plus double-submit token for admin POSTs
     validation.ts      strict zod parsing that never echoes a submitted value
     context.ts         per-request assembly of the above
@@ -48,6 +50,8 @@ src/worker/            Cloudflare Worker (Hono)
     email.ts           transactional email, recorded per message
     email-events.ts    delivery events, and the one status change they cause
     application-workflow.ts  what happens after a payment is verified
+    nbtc-completion.ts       recording the registration and finishing
+    admin-view.ts            what the manager sees; the only audited decrypt
     workflow-factory.ts      assembly shared by the routes that run it
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
@@ -299,6 +303,42 @@ PAYMENT_VERIFIED → ออกเลขที่ใบสมัคร → RECEIP
 - `POST /api/payment/verify` รัน workflow ต่อทันทีหลัง commit การยืนยัน แล้วคืนสถานะแต่ละขั้นมาด้วย
 - `GET /api/applications/:id/confirmation` อ่านสถานะแต่ละขั้น (หัวข้อ 66) **อ่านอย่างเดียว** — การ resume จาก GET จะทำให้การ refresh หน้า, prefetch หรือ link preview ส่งอีเมลได้
 - `POST /api/applications/:id/finalize` เดินขั้นที่ค้างให้จบ ใช้ capability token เดิมกับที่ยืนยันการชำระเงิน และมี rate limit เพราะเรียก provider ได้ ฝั่งผู้จัดการจะได้ action เทียบเท่าที่ไม่ต้องใช้ token ของผู้สมัครใน #16
+
+## Admin
+
+**ทุก route ตรวจ Access JWT ในตัว Worker เอง ไม่ใช่พึ่งการตั้งค่าที่ edge เท่านั้น** Access ที่วางไว้หน้า `/admin*` และ `/api/admin/*` คือ setting เดียวใน dashboard — ถ้ามันถูกลบ, ถูกผูกกับ hostname ผิด หรือ path ไม่ตรง ทุก endpoint จะกลายเป็นสาธารณะทันที การตรวจซ้ำในนี้ทำให้ความผิดพลาดใน dashboard มีราคาเท่ากับ downtime ไม่ใช่ข้อมูลรั่ว
+
+Token เป็น JWT ที่เซ็นด้วย RS256 ตรวจ signature กับ certificate ของทีม (`/cdn-cgi/access/certs`) แล้วตรวจ claim: `iss` ต้องเป็นทีมนี้, `aud` ต้องเป็น **application นี้** — ข้อนี้สำคัญที่สุด เพราะถ้าไม่ตรวจ token ที่ออกให้ application อื่นในบัญชีเดียวกันจะใช้ที่นี่ได้ — และช่วงเวลาต้องยังไม่หมดอายุ `alg` ถูกกำหนดเป็น RS256 ไม่อ่านจาก token เพราะการอ่านจาก token เปิดทาง `alg: none` และการใช้ public key เป็น shared secret
+
+ค่า tolerance ของนาฬิกาใช้กับ `nbf` และ `iat` เท่านั้น ไม่ใช้กับ `exp` — การผ่อนที่ `exp` คือการต่ออายุ token ที่หมดแล้ว และ Access token มีอายุเป็นชั่วโมงอยู่แล้วจึงไม่ต้องผ่อน
+
+ทุกความล้มเหลวตอบข้อความเดียวกัน ผู้เรียกรู้แค่ว่าเข้าได้หรือไม่ได้ ไม่รู้ว่าด่านไหนปฏิเสธ — ความต่างระหว่าง "aud ผิด" กับ "หมดอายุ" คือสิ่งที่คนกำลังลองเจาะอยากรู้พอดี
+
+ถ้า certificate endpoint ติดต่อไม่ได้ ระบบ **ปฏิเสธทุกคำขอ** การ fail open ตอน outage คือการเปิด admin API ให้สาธารณะ
+
+### GET ไม่เปลี่ยนสถานะ เด็ดขาด
+
+Email security scanner เปิด URL ในอีเมลเอง ถ้า `GET` เปลี่ยนสถานะได้ gateway ป้องกันไวรัสจะกดรับเรื่องหรือกดยืนยันการบันทึกทะเบียนแทนผู้จัดการ (หัวข้อ 37) ทุกการเปลี่ยนสถานะจึงเป็น `POST` และต้องผ่าน origin check กับ double-submit CSRF token เพิ่ม เพราะ Access authenticate ด้วย cookie และ cookie ถูกส่งไปกับ cross-site request ด้วย
+
+link ในอีเมลผู้จัดการชี้ไปหน้าใน portal ไม่ใช่ endpoint เหล่านี้ — หน้านั้นแสดงว่ากำลังจะเกิดอะไรแล้ว POST จากที่นั่น
+
+### เลขบัตรประชาชนกับการ audit
+
+`admin-view.ts` เป็นที่เดียวใน admin flow ที่ถอดรหัสเลขบัตร และมันบันทึก `CITIZEN_ID_ACCESSED` ในการเรียกเดียวกัน จึงไม่มีทางเพิ่มผู้อ่านคนที่สองภายหลังแล้วลืมบันทึก ทุกครั้งที่เปิดหน้ารายละเอียดถูกนับหนึ่งครั้ง — trail จึงตอบได้ว่าใครดูกี่ครั้ง
+
+list view ไม่มีข้อมูลส่วนบุคคลเกินชื่อ ผู้จัดการที่ไล่ดูคิวงานไม่ต้องใช้ที่อยู่หรือเบอร์โทร และ list endpoint คือตัวที่มีโอกาสถูก log, cache หรือถ่ายจอมากที่สุด
+
+รูปสมาชิกส่งผ่าน Worker ที่ authenticate แล้วเท่านั้น ไม่มี signed URL — URL ที่ใช้ได้โดยไม่ผ่าน Access จะอยู่นานกว่า session ของผู้จัดการและถูก forward ได้ (หัวข้อ 14)
+
+### บันทึกทะเบียน กสทช.
+
+`nbtc-completion.ts` มีรูปเดียวกับ post-payment workflow และด้วยเหตุผลเดียวกัน:
+
+```text
+NBTC_RECORDED → MEMBER_COMPLETION_EMAIL_SENT → COMPLETED
+```
+
+`COMPLETED` บันทึกเมื่อสมาชิกได้รับแจ้งแล้วเท่านั้น เพราะนั่นคือสิ่งที่สถานะนี้อ้าง ถ้าอีเมลล้ม การบันทึกทะเบียนยังอยู่ (`NBTC_RECORDED`) และการเรียกซ้ำจะทำเฉพาะส่วนที่ยังขาด ตัวตนผู้จัดการถูกเก็บใน `nbtc_recorded_by` และใน audit event — เป็นที่เดียวที่ระบบเก็บตัวตนของเจ้าหน้าที่ และจำเป็น เพราะการบันทึกทะเบียนกับหน่วยงานกำกับต้องระบุได้ว่าใครทำ
 
 ## Decision records
 

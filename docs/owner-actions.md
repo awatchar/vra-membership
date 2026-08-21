@@ -23,19 +23,21 @@ pwsh -File ./scripts/set-production-secrets.ps1 -WhatIf
 pwsh -File ./scripts/set-production-secrets.ps1
 ```
 
-| Secret                                                       | ได้จากไหน                                    |
-| ------------------------------------------------------------ | -------------------------------------------- |
-| `IAPP_API_KEY`                                               | บัญชี iApp                                   |
-| `SLIPOK_API_KEY`                                             | บัญชี SlipOK                                 |
-| `SLIPOK_BRANCH_ID`                                           | SlipOK — branch id ที่อยู่ใน endpoint path   |
-| `RESEND_API_KEY`                                             | บัญชี Resend                                 |
-| `RESEND_WEBHOOK_SECRET`                                      | Resend → Webhooks → signing secret           |
-| `TURNSTILE_SECRET_KEY`                                       | Cloudflare → Turnstile → widget ที่สร้างใหม่ |
-| `PII_ENCRYPTION_KEY`                                         | ปล่อยว่างไว้ สคริปต์สร้างให้                 |
-| `MANAGER_EMAIL`                                              | email ผู้จัดการสมาคม                         |
-| `EMAIL_FROM`                                                 | sender ของ transactional email               |
-| `VRA_BANK_NAME`, `VRA_BANK_ACCOUNT`, `VRA_BANK_ACCOUNT_NAME` | ข้อมูลบัญชีสมาคม                             |
-| `EMAIL_FROM_TRACKED` (ไม่บังคับ)                             | sender แยกสำหรับ open tracking — ดูข้อ 2     |
+| Secret                                                       | ได้จากไหน                                                      |
+| ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `IAPP_API_KEY`                                               | บัญชี iApp                                                     |
+| `SLIPOK_API_KEY`                                             | บัญชี SlipOK                                                   |
+| `SLIPOK_BRANCH_ID`                                           | SlipOK — branch id ที่อยู่ใน endpoint path                     |
+| `RESEND_API_KEY`                                             | บัญชี Resend                                                   |
+| `RESEND_WEBHOOK_SECRET`                                      | Resend → Webhooks → signing secret                             |
+| `TURNSTILE_SECRET_KEY`                                       | Cloudflare → Turnstile → widget ที่สร้างใหม่                   |
+| `PII_ENCRYPTION_KEY`                                         | ปล่อยว่างไว้ สคริปต์สร้างให้                                   |
+| `MANAGER_EMAIL`                                              | email ผู้จัดการสมาคม                                           |
+| `EMAIL_FROM`                                                 | sender ของ transactional email                                 |
+| `VRA_BANK_NAME`, `VRA_BANK_ACCOUNT`, `VRA_BANK_ACCOUNT_NAME` | ข้อมูลบัญชีสมาคม                                               |
+| `EMAIL_FROM_TRACKED` (ไม่บังคับ)                             | sender แยกสำหรับ open tracking — ดูข้อ 2                       |
+| `CF_ACCESS_TEAM_DOMAIN`                                      | Cloudflare Zero Trust → Settings → team domain                 |
+| `CF_ACCESS_AUD`                                              | Access application → Overview → Application Audience (AUD) tag |
 
 > **`PII_ENCRYPTION_KEY` เปลี่ยนไม่ได้หลังมีข้อมูลจริง** ciphertext ของเลขบัตรและ hash ที่ใช้ค้นหาซ้ำ derive จาก key นี้ทั้งคู่ และไม่มีสำเนา plaintext เก็บไว้ที่ไหนเลย **สำรอง key ไว้ที่ปลอดภัยและออฟไลน์ก่อนลบไฟล์ค่า** ถ้า key หาย เลขบัตรทุกใบอ่านไม่ได้อีกเลย
 >
@@ -47,7 +49,8 @@ pwsh -File ./scripts/set-production-secrets.ps1
 
 - [ ] **Turnstile site** — สร้าง widget เก็บ secret key ไว้ใส่ในข้อ 1 ส่วน site key เป็นค่าสาธารณะที่จะใส่ใน client build (#17)
 - [ ] **Custom domain** — ผูก `member.vra.or.th` เข้ากับ Worker `vra-membership` (`wrangler.jsonc` ประกาศ route ไว้แล้ว จะถูกสร้างตอน deploy ครั้งแรก แต่ DNS ต้องพร้อม)
-- [ ] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) ใช้จริงเมื่อ #16 เสร็จ
+- [ ] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) แล้วคัดลอก **AUD tag** จากหน้า Overview ของ application ไปใส่ `CF_ACCESS_AUD` และ team domain ไปใส่ `CF_ACCESS_TEAM_DOMAIN` ในข้อ 1
+      Worker ตรวจ JWT เองอีกชั้นด้วย ดังนั้น **ถ้าสอง secret นี้ยังไม่ได้ตั้ง ทุก admin endpoint จะปฏิเสธทุกคำขอ** ซึ่งเป็นพฤติกรรมที่ต้องการ — ไม่มีสถานะ "ยังไม่ตั้งค่าแล้วเข้าได้เลย"
 - [ ] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
 - [ ] **Resend — endpoint ของ webhook** — เพิ่ม endpoint `https://member.vra.or.th/api/webhooks/resend` แล้วเลือก event `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced` จากนั้นคัดลอก signing secret ไปใส่ `RESEND_WEBHOOK_SECRET` ในข้อ 1
       ระบบตอบ 2xx ให้ event ที่ไม่ได้เลือกด้วย จึงเลือกเพิ่มได้โดยไม่พัง แต่ **การเปลี่ยนสถานะใบสมัครอาศัย `email.opened`** ถ้าไม่เลือก ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" เอง
