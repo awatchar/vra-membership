@@ -37,6 +37,10 @@ export default defineConfig(async () => {
             // Invented account details. `receiverAccountDigits` from the mock
             // slip provider is `1234`, which has to appear in order inside the
             // configured account for the receiver check to pass.
+            // Access team and audience for the admin tests, which mint real
+            // RS256 tokens against a JWKS the test itself serves.
+            CF_ACCESS_TEAM_DOMAIN: 'vra-test',
+            CF_ACCESS_AUD: 'test-only-access-audience-tag',
             VRA_BANK_ACCOUNT: '001234567890',
             VRA_BANK_NAME: 'ธนาคารตัวอย่าง',
             VRA_BANK_ACCOUNT_NAME: 'สมาคมนักวิทยุอาสาสมัคร (ตัวอย่าง)',
