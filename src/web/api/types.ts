@@ -10,10 +10,26 @@
 export type MembershipType = 'FIVE_YEAR' | 'LIFETIME';
 export type PhotoSource = 'ID_CARD' | 'UPLOAD';
 
+/**
+ * The association's own contact details, shown in the footer.
+ *
+ * Every field but the name is optional, and a missing one renders nothing -
+ * showing a blank row or an example value would be worse than one fewer line,
+ * because somebody would try it.
+ */
+export interface AssociationContact {
+  name: string;
+  postalAddress: string | null;
+  email: string | null;
+  lineId: string | null;
+  phone: string | null;
+}
+
 export interface PublicConfig {
   /** Absent when Turnstile is not configured, e.g. local development. */
   turnstileSiteKey: string | null;
   environment: string;
+  association: AssociationContact;
 }
 
 export interface OcrFields {

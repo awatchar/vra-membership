@@ -4,6 +4,7 @@ import { App } from './App';
 import { AdminApp } from './admin/AdminApp';
 import { PrivacyNotice } from './privacy/PrivacyNotice';
 import './styles/global.css';
+import './styles/site.css';
 import './styles/wizard.css';
 import './styles/admin.css';
 

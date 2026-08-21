@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/Alert';
+import { SiteFooter } from '../components/SiteFooter';
+import { SiteHeader } from '../components/SiteHeader';
+import { api } from '../api/client';
+import type { AssociationContact } from '../api/types';
 import { adminApi } from './api';
 import type { AdminSession } from './api';
 import { ConfirmPage } from './ConfirmPage';
@@ -28,10 +32,30 @@ import type { AdminRoute } from './route';
  * client - and the pages they land on must do nothing on their own.
  */
 
+/** Same fallback as the wizard: a name, and no invented contact details. */
+const FALLBACK_ASSOCIATION: AssociationContact = {
+  name: 'สมาคมนักวิทยุอาสาสมัคร',
+  postalAddress: null,
+  email: null,
+  lineId: null,
+  phone: null,
+};
+
 export function AdminApp() {
   const [route, setRoute] = useState<AdminRoute>(() => parseAdminRoute(window.location.pathname));
   const [session, setSession] = useState<AdminSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [association, setAssociation] = useState<AssociationContact>(FALLBACK_ASSOCIATION);
+
+  // `/api/config` is public and needs no Access, so the header and footer are
+  // right even on the page that says the manager could not be authenticated -
+  // which is the page they most need a contact address on.
+  useEffect(() => {
+    api
+      .config()
+      .then((config) => setAssociation(config.association))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     adminApi
@@ -61,35 +85,36 @@ export function AdminApp() {
 
   const toQueue = useCallback(() => navigate(queuePath()), [navigate]);
 
+  const frame = (children: React.ReactNode, aside?: React.ReactNode) => (
+    <div className="vra-page">
+      <SiteHeader
+        associationName={association.name}
+        subtitle="ระบบผู้จัดการ"
+        {...(aside ? { aside } : {})}
+      />
+      <main className="vra-admin">{children}</main>
+      <SiteFooter contact={association} />
+    </div>
+  );
+
   if (error) {
-    return (
-      <main className="vra-admin">
-        <Alert tone="error" title="เข้าถึงระบบผู้จัดการไม่ได้">
-          <p>{error}</p>
-          <p>
-            หากเพิ่งเข้าสู่ระบบ กรุณาโหลดหน้านี้อีกครั้ง หากยังเข้าไม่ได้
-            กรุณาตรวจสอบว่าบัญชีของท่านได้รับสิทธิ์ในระบบ Cloudflare Access แล้ว
-          </p>
-        </Alert>
-      </main>
+    return frame(
+      <Alert tone="error" title="เข้าถึงระบบผู้จัดการไม่ได้">
+        <p>{error}</p>
+        <p>
+          หากเพิ่งเข้าสู่ระบบ กรุณาโหลดหน้านี้อีกครั้ง หากยังเข้าไม่ได้
+          กรุณาตรวจสอบว่าบัญชีของท่านได้รับสิทธิ์ในระบบ Cloudflare Access แล้ว
+        </p>
+      </Alert>,
     );
   }
 
   if (!session) {
-    return (
-      <main className="vra-admin">
-        <p className="vra-muted">กำลังตรวจสอบสิทธิ์...</p>
-      </main>
-    );
+    return frame(<p className="vra-muted">กำลังตรวจสอบสิทธิ์...</p>);
   }
 
-  return (
-    <main className="vra-admin">
-      <header className="vra-admin__header">
-        <p className="vra-admin__brand">ระบบผู้จัดการ · สมาคมนักวิทยุอาสาสมัคร</p>
-        <p className="vra-admin__manager">{session.manager.email}</p>
-      </header>
-
+  return frame(
+    <>
       {route.kind === 'queue' ? <QueuePage onOpen={navigate} /> : null}
 
       {route.kind === 'detail' ? (
@@ -119,6 +144,7 @@ export function AdminApp() {
           </button>
         </Alert>
       ) : null}
-    </main>
+    </>,
+    <span className="vra-admin__manager">{session.manager.email}</span>,
   );
 }
