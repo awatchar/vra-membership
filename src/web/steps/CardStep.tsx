@@ -30,8 +30,13 @@ export function CardStep({ busy, error, onSelect, onManualEntry, turnstileSlot }
         </Alert>
       ) : null}
 
+      <p className="vra-muted">
+        ใช้ภาพที่มีอยู่แล้วในเครื่องก็ได้ หรือถ่ายใหม่ก็ได้ — เมื่อกดเลือกไฟล์
+        เครื่องของท่านจะให้เลือกได้ทั้งกล้อง อัลบั้ม และไฟล์
+      </p>
+
       <ol className="vra-tips">
-        <li>วางบัตรบนพื้นเรียบสีเข้ม ถ่ายจากด้านบนตรง ๆ</li>
+        <li>ถ้าถ่ายใหม่ วางบัตรบนพื้นเรียบสีเข้ม ถ่ายจากด้านบนตรง ๆ</li>
         <li>ให้เห็นบัตรทั้งใบ ไม่มีนิ้วบังตัวเลข</li>
         <li>หลีกเลี่ยงแสงสะท้อนบนบัตร</li>
       </ol>
@@ -39,7 +44,6 @@ export function CardStep({ busy, error, onSelect, onManualEntry, turnstileSlot }
       <ImagePicker
         label="เลือกหรือถ่ายภาพด้านหน้าบัตรประชาชน"
         hint="ระบบใช้ภาพนี้เพื่ออ่านข้อมูลเท่านั้น และไม่เก็บภาพบัตรไว้"
-        capture="environment"
         disabled={busy}
         onSelect={onSelect}
       />

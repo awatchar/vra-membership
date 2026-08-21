@@ -102,8 +102,7 @@ export function PhotoStep({
       {state.photoSource === 'UPLOAD' ? (
         <ImagePicker
           label="เลือกหรือถ่ายรูปใหม่"
-          hint="ถ่ายหน้าตรง เห็นใบหน้าชัด ฉากหลังเรียบ"
-          capture="user"
+          hint="ใช้รูปที่มีอยู่แล้วได้ ขอให้เห็นหน้าตรง ใบหน้าชัด ฉากหลังเรียบ"
           disabled={busy}
           onSelect={onUpload}
         />

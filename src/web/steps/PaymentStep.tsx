@@ -94,7 +94,7 @@ export function PaymentStep({
 
       <ImagePicker
         label="เลือกภาพสลิปการโอนเงิน"
-        capture="environment"
+        hint="ใช้ภาพหน้าจอ (screenshot) จากแอปธนาคารได้เลย ไม่ต้องถ่ายใหม่"
         disabled={busy || reading}
         onSelect={onSlipSelected}
       />

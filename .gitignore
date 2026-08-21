@@ -33,3 +33,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# A tool on Windows expanded `%SystemDrive%` as a literal path once and left a
+# copy of Windows' own cache files under the repository root. Ignored so a
+# `git add -A` cannot commit them; the directory itself is safe to delete.
+/%SystemDrive%/

@@ -9,22 +9,24 @@ import type { ReactNode } from 'react';
  * reachable, announces itself correctly, and works when scripting is partly
  * broken. A `<button>` driving a hidden input has to reimplement all three.
  *
- * `capture="environment"` asks a phone for the rear camera, which is what you
- * point at a card or a slip. It is a hint - a desktop browser ignores it and
- * opens the file picker, which is the right behaviour there.
+ * **There is deliberately no `capture` attribute.** An earlier version set it,
+ * on the belief that it merely hints at the rear camera. On Android Chrome it
+ * does not hint: it opens the camera and removes the album and file options
+ * altogether. That broke the step it mattered most on - a payment slip is
+ * usually already a screenshot in the album, so an applicant on Android could
+ * not submit one at all. Without the attribute the operating system offers the
+ * camera, the album and the files, and the applicant picks.
  */
 
 export interface ImagePickerProps {
   label: string;
   hint?: ReactNode;
-  /** `environment` for documents; omit to let the applicant pick any file. */
-  capture?: 'environment' | 'user';
   disabled?: boolean;
   onSelect: (file: File) => void;
   error?: string | undefined;
 }
 
-export function ImagePicker({ label, hint, capture, disabled, onSelect, error }: ImagePickerProps) {
+export function ImagePicker({ label, hint, disabled, onSelect, error }: ImagePickerProps) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +43,6 @@ export function ImagePicker({ label, hint, capture, disabled, onSelect, error }:
         className="vra-picker__input"
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        {...(capture ? { capture } : {})}
         disabled={disabled}
         aria-invalid={error ? true : undefined}
         onChange={(event) => {
