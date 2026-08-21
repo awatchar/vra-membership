@@ -13,6 +13,7 @@ import type { AuditLog } from './audit';
 import { generateAccessToken } from './application-access';
 import type { ApplicationAccess } from './application-access';
 import { membershipPlan } from './membership';
+import type { StateMachine } from './state-machine';
 
 /**
  * Application lifecycle up to payment.
@@ -202,6 +203,7 @@ export function createApplicationService(
   protection: CitizenIdProtection,
   access: ApplicationAccess,
   audit: AuditLog,
+  stateMachine: StateMachine,
 ): ApplicationService {
   const requireEditable = async (applicationId: string): Promise<ApplicationRecord> => {
     const record = await db.applications.findById(applicationId);
@@ -280,6 +282,18 @@ export function createApplicationService(
         });
       }
 
+      if (input.address) {
+        validateAddress(input.address);
+        try {
+          await db.addresses.upsert(applicationId, toAddressRow(input.address));
+        } catch (error) {
+          // A CHECK violation here means a value the schema rejects, e.g. a
+          // malformed postcode that slipped past validation.
+          if (error instanceof UniqueConstraintError) throw error;
+          throw new ApiError('VALIDATION_FAILED', MESSAGES.mailPostcode, { cause: error });
+        }
+      }
+
       if (input.membershipType) {
         // Resolved from the catalogue. An amount from the client is not read at
         // all, so there is nothing to ignore.
@@ -291,17 +305,15 @@ export function createApplicationService(
           actorType: 'APPLICANT',
           metadata: { membershipType: plan.type, amountSatang: plan.amountSatang },
         });
-      }
 
-      if (input.address) {
-        validateAddress(input.address);
-        try {
-          await db.addresses.upsert(applicationId, toAddressRow(input.address));
-        } catch (error) {
-          // A CHECK violation here means a value the schema rejects, e.g. a
-          // malformed postcode that slipped past validation.
-          if (error instanceof UniqueConstraintError) throw error;
-          throw new ApiError('VALIDATION_FAILED', MESSAGES.mailPostcode, { cause: error });
+        // Confirming the plan is the applicant's explicit move into payment.
+        // Without this transition the UI can show bank instructions while the
+        // payment service still (correctly) refuses a DRAFT application.
+        const transition = await stateMachine.transition(applicationId, 'AWAITING_PAYMENT', {
+          actorType: 'APPLICANT',
+        });
+        if (transition.kind !== 'APPLIED' && transition.kind !== 'ALREADY_IN_TARGET_STATE') {
+          throw new ApiError('CONFLICT', MESSAGES.notEditable);
         }
       }
 

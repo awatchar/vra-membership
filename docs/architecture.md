@@ -156,6 +156,8 @@ COMPLETED, CANCELLED and REFUNDED are terminal
 - **Idempotent** การขอสถานะที่เป็นอยู่แล้วเป็น no-op ไม่บันทึก audit event ซ้ำ และไม่ทำ side effect ซ้ำ
 - **Concurrency-safe** การเขียนเป็น compare-and-set บนสถานะที่อ่านมาจริง ไม่ใช่บนชุด predecessor ทั้งหมด เพื่อให้ `from` ใน audit event เป็นค่าที่เคยเป็นจริงเสมอ
 
+การยืนยันประเภทสมาชิกเป็นจุดที่ application service บันทึกยอดจาก catalogue แล้วเปลี่ยน `DRAFT -> AWAITING_PAYMENT` ผ่าน state machine ก่อนคืนหน้า payment ทำให้หน้าที่ผู้สมัครเห็นกับสถานะที่ payment service ตรวจเป็นสัญญาเดียวกัน สำหรับใบสมัคร production เก่าที่เคยบันทึกประเภทสมาชิกแต่ขาด transition จากบั๊ก #55 การส่งสลิปครั้งถัดไปซ่อมเฉพาะสถานะ `DRAFT` รูปแบบนี้ผ่าน transition เดิม **ก่อน** เรียก provider; draft ที่ไม่มีประเภทสมาชิกและสถานะอื่นยัง fail closed เหมือนเดิม
+
 ## Numbering
 
 `VRA-{พ.ศ.}-{running}` และ `VRA-RC-{พ.ศ.}-{running}` โดย prefix และความยาว sequence เป็น config ปี พ.ศ. คำนวณจากเวลา Asia/Bangkok ไม่ใช่จากวัน UTC ใบสมัครที่ส่งเวลา 23:30 UTC ของวันที่ 31 ธันวาคม จึงได้เลขของปีถัดไป
