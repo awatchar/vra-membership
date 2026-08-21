@@ -82,6 +82,12 @@ src/web/               React client, built to dist/client
   lib/turnstile.ts     the one third-party script, loaded lazily
   components/          Field, Button, Alert, CropBox, QrCode, StepFrame
   steps/               one component per wizard step
+  lib/datetime.ts      Bangkok time and the Buddhist era, everywhere
+  admin/AdminApp.tsx   manager portal; path routing, no router dependency
+  admin/api.ts         admin API; Access cookie plus the CSRF token
+  admin/QueuePage.tsx  the queue, carrying no detail beyond a name
+  admin/DetailPage.tsx one application; the citizen ID is a separate request
+  admin/ConfirmPage.tsx  the page an email link lands on; acts only on a POST
 migrations/            append-only D1 migrations
 tests/                 Vitest suites, all running inside workerd
 ```
@@ -386,6 +392,34 @@ checklist ยืนยันเป็นสามข้อ ไม่ใช่ข
 ทุก input ผ่าน component `Field` เดียว จึงทำให้ "ทุกช่องมี label" เป็นคุณสมบัติของโค้ด ไม่ใช่ความเคยชิน — error ผูกด้วย `aria-describedby` + `aria-invalid` + `role="alert"` และ required ทำเครื่องหมายทั้งด้วยสายตาและด้วย attribute เพราะดอกจันสีแดงมองไม่เห็นสำหรับ screen reader และสำหรับคนที่แยกสีไม่ได้
 
 heading ของแต่ละขั้นถูก focus เมื่อเปลี่ยนขั้น เพราะใน wizard หน้าเดียวไม่มีอะไรประกาศการเปลี่ยนขั้น ผู้ใช้ screen reader ที่กด "ถัดไป" จะได้ยินความเงียบและต้องไปหาเองว่าอะไรเปลี่ยน
+
+## Admin portal
+
+หน้าเดียวกับ wizard คนละ path — `/admin*` เป็น portal ผู้จัดการ ที่เหลือเป็น wizard ผู้สมัคร แชร์ bundle เพราะแชร์ component กับ stylesheet และการแยก build สองชุดสำหรับระบบที่รับหนึ่งถึงสองใบสมัครต่อวันไม่คุ้ม แต่ไม่แชร์ข้อมูลกันเลย — portal ไม่ render ตอน wizard ทำงาน และ wizard ไม่ถือ state ของ admin
+
+สิ่งแรกที่ portal ทำคือเรียก `GET /api/admin/session` ซึ่งทำสองอย่างพร้อมกัน: พิสูจน์ว่าผู้เรียกผ่าน Access แล้ว และคืน CSRF token ที่ทุกการเปลี่ยนสถานะต้องแนบ **ถ้าเรียกไม่ผ่าน ไม่ render หน้าใดเลย** ไม่มีสถานะ "ใช้ได้บางส่วน" — ไม่มี CSRF token ก็ยืนยันอะไรไม่ได้อยู่แล้ว และ portal ที่ดูเหมือนทำงานได้แต่ทุก action ล้มเหลวแย่กว่าการบอกตรง ๆ
+
+### เลขบัตรประชาชนแยกเป็น request ของตัวเอง
+
+เดิม (#16) หน้า detail ถอดรหัสเลขบัตรตอนโหลด ทำให้ทุกครั้งที่ผู้จัดการเปิดดูใบสมัครเกิด `CITIZEN_ID_ACCESSED` — audit trail จึงแยกไม่ออกระหว่าง "ผู้จัดการเปิดดูเลขบัตร" กับ "ผู้จัดการเปิดหน้า"
+
+ตอนนี้เลขบัตร**ไม่อยู่ใน detail เลย** และมี `GET /api/admin/applications/:id/citizen-id` แยก ผู้จัดการต้องกดปุ่มเพื่อเปิดดู หน้าเว็บบอกด้วยว่าการเปิดดูจะถูกบันทึก ผลคือ entry ใน trail หมายถึงมีคนถามหาเลขจริง ๆ และเลขไม่ค้างอยู่บนจอให้ถูกถ่ายภาพโดยไม่ได้ตั้งใจ
+
+### GET ไม่เปลี่ยนอะไร และหน้ายืนยันรู้สถานะก่อน
+
+link ในอีเมลผู้จัดการชี้มาที่ `/admin/applications/:id/acknowledge` และ `/nbtc-complete` ซึ่งเป็นหน้ายืนยัน ไม่ใช่ endpoint — email security scanner เปิด link เอง ถ้าหน้านั้นทำงานทันที gateway ป้องกันไวรัสจะกดรับเรื่องหรือแจ้งสมาชิกว่าบันทึกทะเบียนเสร็จแทนผู้จัดการ (หัวข้อ 37)
+
+หน้ายืนยันโหลดใบสมัครก่อนแล้ว **ไม่เสนอ action ที่สถานะปัจจุบันทำไม่ได้** ถ้าเปิดอีเมลฉบับเก่าซ้ำ หน้าจะบอกว่าดำเนินการไปแล้ว แทนที่จะแสดงปุ่มที่กดแล้วล้มเหลว ซึ่งจะทำให้ผู้จัดการไม่รู้ว่าครั้งแรกสำเร็จหรือไม่
+
+### รูปสมาชิกและใบเสร็จ
+
+เป็น `<img src>` และ `<a href>` ชี้ไปที่ endpoint ที่ authenticate แล้วโดยตรง เบราว์เซอร์ส่ง Access cookie ให้เอง จึงไม่มี URL ที่เปิดได้โดยไม่ผ่าน Access และไม่มีอะไรให้ forward (หัวข้อ 14)
+
+### เวลาและรายการคิว
+
+ทุกเวลาแสดงเป็น Asia/Bangkok และปีพุทธศักราช ผู้จัดการอ่านมันข้างเอกสารที่พิมพ์ `2569` และวันเกิดที่ผู้สมัครกรอกมาจากบัตรที่พิมพ์แบบเดียวกัน `th-TH-u-ca-buddhist` ระบุปฏิทินไว้ตรง ๆ ไม่พึ่งว่า `th-TH` จะ default เป็นพุทธศักราช ซึ่งจริงใน ICU ปัจจุบันแต่ไม่ใช่การรับประกัน
+
+รายการคิวเปิดที่ "ที่ต้องดำเนินการ" ไม่ใช่ทั้งหมด และแต่ละแถวมีแค่ชื่อ เลขที่ใบสมัคร ยอด และสถานะ — ไม่มีที่อยู่ ไม่มีเบอร์โทร ไม่มีเลขบัตร นี่เป็นหน้าที่มีโอกาสถูกเปิดค้างบนจอที่ใช้ร่วมกันหรือถูกถ่ายภาพมากที่สุด และข้อมูลเหล่านั้นไม่จำเป็นต่อการเลือกว่าจะเปิดใบไหน
 
 ## Decision records
 
