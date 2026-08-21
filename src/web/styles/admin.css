@@ -1,0 +1,347 @@
+/*
+ * Manager portal.
+ *
+ * Wider than the wizard because the detail page is a lot of fields and a
+ * timeline, and the manager is usually at a desk - but still one column, because
+ * the same person opens this from a phone after reading the notification email,
+ * and a two-column layout that collapses badly is worse than one that never
+ * needed to.
+ *
+ * Reuses the wizard's buttons, alerts and detail rows. The manager and the
+ * applicant see the same kind of controls, and a second set of primitives would
+ * drift.
+ */
+
+.vra-admin {
+  margin: 0 auto;
+  max-width: 52rem;
+  padding: 1rem 1rem 4rem;
+}
+
+.vra-admin__header {
+  align-items: baseline;
+  border-bottom: 1px solid var(--vra-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+}
+
+.vra-admin__brand {
+  font-weight: 700;
+  margin: 0;
+}
+
+.vra-admin__manager {
+  color: var(--vra-text-muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.vra-admin__title {
+  font-size: 1.375rem;
+  margin: 1.25rem 0 0.25rem;
+}
+
+.vra-admin__subtitle {
+  margin: 0 0 1rem;
+}
+
+.vra-panel {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: var(--vra-radius);
+  margin-top: 1rem;
+  padding: 1rem 1.125rem 1.25rem;
+}
+
+.vra-panel__title {
+  font-size: 1.0625rem;
+  margin: 0 0 0.5rem;
+}
+
+.vra-panel ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+/* ---------------------------------------------------------------- filters --- */
+
+.vra-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.vra-chip {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: 999px;
+  color: var(--vra-text);
+  cursor: pointer;
+  font: inherit;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.875rem;
+}
+
+.vra-chip--active {
+  background: var(--vra-navy);
+  border-color: var(--vra-navy);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.vra-chip:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ queue --- */
+
+.vra-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vra-queue__item {
+  background: var(--vra-surface);
+  border: 1px solid var(--vra-border);
+  border-radius: var(--vra-radius);
+  margin-bottom: 0.625rem;
+  padding: 0.875rem 1rem;
+}
+
+.vra-queue__link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.vra-queue__link:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 3px;
+}
+
+.vra-queue__reference {
+  display: block;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.vra-queue__name {
+  color: var(--vra-navy);
+  display: block;
+  text-decoration: underline;
+}
+
+.vra-queue__meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* ------------------------------------------------------------------ badge --- */
+
+.vra-badge {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.125rem 0.625rem;
+}
+
+.vra-badge--idle {
+  background: var(--vra-surface-muted);
+  border-color: var(--vra-border);
+  color: var(--vra-text-muted);
+}
+
+.vra-badge--busy {
+  background: #e8f0f9;
+  border-color: #b7cfe6;
+  color: #1a4a77;
+}
+
+.vra-badge--action {
+  background: #fff3d6;
+  border-color: #e5c777;
+  color: #6b4a06;
+}
+
+.vra-badge--done {
+  background: #e4f4ea;
+  border-color: #9fd3b3;
+  color: #14603a;
+}
+
+.vra-badge--stop {
+  background: #fbe6e5;
+  border-color: #e3a7a3;
+  color: #8a201b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .vra-badge--busy {
+    background: #14283a;
+    border-color: #2c4b6b;
+    color: #a8cbe9;
+  }
+
+  .vra-badge--action {
+    background: #362c11;
+    border-color: #6b5720;
+    color: #f0d69a;
+  }
+
+  .vra-badge--done {
+    background: #14301f;
+    border-color: #2c5b3f;
+    color: #a5d8bb;
+  }
+
+  .vra-badge--stop {
+    background: #351a19;
+    border-color: #6b302c;
+    color: #eaa9a4;
+  }
+}
+
+/* --------------------------------------------------------------- controls --- */
+
+.vra-back {
+  background: none;
+  border: 0;
+  color: var(--vra-navy);
+  cursor: pointer;
+  font: inherit;
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0;
+}
+
+.vra-back:focus-visible {
+  outline: 3px solid var(--vra-navy);
+  outline-offset: 2px;
+}
+
+.vra-link {
+  color: var(--vra-navy);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------- reveal --- */
+
+.vra-reveal {
+  border: 1px dashed var(--vra-border);
+  border-radius: 10px;
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+}
+
+.vra-reveal__title {
+  font-size: 0.9375rem;
+  margin: 0 0 0.25rem;
+}
+
+.vra-reveal__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0.25rem 0 0;
+}
+
+.vra-member-photo {
+  border: 1px solid var(--vra-border);
+  border-radius: 10px;
+  display: block;
+  max-width: 11rem;
+  width: 100%;
+}
+
+/* -------------------------------------------------------------- confirm --- */
+
+.vra-confirm {
+  background: var(--vra-surface-muted);
+  border-radius: var(--vra-radius);
+  margin-top: 1rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.vra-confirm__reference {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 0;
+}
+
+.vra-confirm__name {
+  font-size: 1.125rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.vra-confirm__question {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+}
+
+/* ------------------------------------------------------------- timeline --- */
+
+.vra-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vra-timeline__item {
+  border-left: 2px solid var(--vra-border);
+  padding: 0 0 0.875rem 0.875rem;
+  position: relative;
+}
+
+.vra-timeline__item::before {
+  background: var(--vra-navy);
+  border-radius: 50%;
+  content: '';
+  height: 0.5rem;
+  left: -0.3125rem;
+  position: absolute;
+  top: 0.4375rem;
+  width: 0.5rem;
+}
+
+.vra-timeline__when {
+  color: var(--vra-text-muted);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.vra-timeline__what {
+  font-weight: 600;
+  margin: 0.125rem 0 0;
+}
+
+.vra-timeline__who,
+.vra-timeline__meta {
+  color: var(--vra-text-muted);
+  font-size: 0.8125rem;
+  margin: 0.125rem 0 0;
+  word-break: break-word;
+}
+
+@media (min-width: 48rem) {
+  .vra-details__row {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+  }
+
+  .vra-details dd {
+    text-align: left;
+  }
+}

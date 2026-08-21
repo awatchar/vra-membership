@@ -278,6 +278,7 @@ describe('every admin endpoint requires Access', () => {
     { method: 'POST', path: `/api/admin/applications/${crypto.randomUUID()}/finalize` },
     { method: 'GET', path: `/api/admin/applications/${crypto.randomUUID()}/photo` },
     { method: 'GET', path: `/api/admin/applications/${crypto.randomUUID()}/receipt` },
+    { method: 'GET', path: `/api/admin/applications/${crypto.randomUUID()}/citizen-id` },
   ];
 
   for (const route of paths) {
@@ -378,6 +379,7 @@ describe('GET never changes state', () => {
       `/api/admin/applications/${id}`,
       `/api/admin/applications/${id}/receipt`,
       `/api/admin/applications/${id}/photo`,
+      `/api/admin/applications/${id}/citizen-id`,
     ]) {
       await call(path);
     }
@@ -429,35 +431,60 @@ describe('the application list', () => {
   });
 });
 
-describe('the application detail', () => {
-  it('returns the full citizen ID and records that it was read', async () => {
+describe('the citizen ID', () => {
+  it('is not part of the detail at all', async () => {
     const repo = repository();
     const id = await notifiedApplication(repo);
 
     const response = await call(`/api/admin/applications/${id}`);
-    const body = await response.json<{ detail: { application: { citizenId: string } } }>();
+    const body = await response.text();
+
+    // Opening the page must not decrypt. Otherwise every glance produces an
+    // access event and the trail cannot tell a lookup from a page load.
+    expect(response.status).toBe(200);
+    expect(body).not.toContain(TEST_CITIZEN_ID);
+    const events = await repo.events.listByApplicationId(id);
+    expect(events.some((event) => event.eventType === 'CITIZEN_ID_ACCESSED')).toBe(false);
+  });
+
+  it('is returned on request, and the read is recorded', async () => {
+    const repo = repository();
+    const id = await notifiedApplication(repo);
+
+    const response = await call(`/api/admin/applications/${id}/citizen-id`);
+    const body = await response.json<{ citizenId: string }>();
 
     expect(response.status).toBe(200);
-    expect(body.detail.application.citizenId).toBe(TEST_CITIZEN_ID);
+    expect(body.citizenId).toBe(TEST_CITIZEN_ID);
 
     const events = await repo.events.listByApplicationId(id);
     const access = events.find((event) => event.eventType === 'CITIZEN_ID_ACCESSED');
-    expect(access).toBeDefined();
     expect(access?.actorType).toBe('MANAGER');
     expect(access?.actorId).toBe(MANAGER);
   });
 
-  it('records one access event per read, so the trail counts them', async () => {
+  it('records one event per request, so the trail counts them', async () => {
     const repo = repository();
     const id = await notifiedApplication(repo);
 
-    await call(`/api/admin/applications/${id}`);
-    await call(`/api/admin/applications/${id}`);
+    await call(`/api/admin/applications/${id}/citizen-id`);
+    await call(`/api/admin/applications/${id}/citizen-id`);
 
     const events = await repo.events.listByApplicationId(id);
     expect(events.filter((event) => event.eventType === 'CITIZEN_ID_ACCESSED')).toHaveLength(2);
   });
 
+  it('needs Access like everything else', async () => {
+    const repo = repository();
+    const id = await notifiedApplication(repo);
+
+    const response = await call(`/api/admin/applications/${id}/citizen-id`, { token: null });
+
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('the application detail', () => {
   it('includes what the manager needs to do the registration', async () => {
     const repo = repository();
     const id = await notifiedApplication(repo);

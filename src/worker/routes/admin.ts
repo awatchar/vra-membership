@@ -127,16 +127,37 @@ export const adminRoutes: Hono<AppContext> = new Hono<AppContext>()
   })
 
   .get('/admin/applications/:id', async (c) => {
-    const identity = await authenticate(c);
+    await authenticate(c);
     const applicationId = idSchema.parse(c.req.param('id'));
 
     const view = await buildAdminView(c);
-    const detail = await view.detail(applicationId, identity.email);
+    const detail = await view.detail(applicationId);
 
     c.var.logger.info({ event: 'admin.detail_read', applicationId });
 
     c.header('Cache-Control', 'no-store');
     return c.json({ detail });
+  })
+
+  /**
+   * The full citizen ID, on request only.
+   *
+   * A separate endpoint rather than a field on the detail, so an entry in the
+   * audit trail means the manager asked for the number - not merely that they
+   * opened the page. A `GET` because it changes no application state; the audit
+   * event it writes is a record of the read, which is the point of it.
+   */
+  .get('/admin/applications/:id/citizen-id', async (c) => {
+    const identity = await authenticate(c);
+    const applicationId = idSchema.parse(c.req.param('id'));
+
+    const view = await buildAdminView(c);
+    const citizenId = await view.revealCitizenId(applicationId, identity.email);
+
+    c.var.logger.info({ event: 'admin.citizen_id_revealed', applicationId });
+
+    c.header('Cache-Control', 'no-store');
+    return c.json({ citizenId });
   })
 
   /**

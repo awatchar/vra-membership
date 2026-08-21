@@ -18,11 +18,17 @@ import { formatBaht, membershipPlan } from './membership';
 /**
  * What the manager sees (Issue #1 sections 52-53).
  *
- * This module exists so that reading an application's full details is one code
- * path with the audit event attached to it. The citizen ID is decrypted here and
- * nowhere else in the admin flow, and `CITIZEN_ID_ACCESSED` is recorded on the
- * same call - so there is no way to add a second reader later that forgets to
- * record it.
+ * The citizen ID is **not** part of the detail. `revealCitizenId` is a separate
+ * call, and it is the only place in the admin flow that decrypts, recording
+ * `CITIZEN_ID_ACCESSED` on the same call - so there is no way to add a second
+ * reader later that forgets to record it.
+ *
+ * Splitting it out is what makes the audit trail mean something. When the detail
+ * page decrypted on load, every glance at an application produced an access
+ * event, so the trail could not distinguish "the manager looked up the number"
+ * from "the manager opened the page". Now an entry exists only when someone
+ * actually asked for the number, which is also what stops it sitting on screen
+ * for a screenshot nobody intended.
  *
  * The list view carries no personal data beyond a name. A manager scanning a
  * queue does not need addresses or contact details, and a list endpoint is the
@@ -65,8 +71,6 @@ export interface AdminDetail {
     lastNameEn: string | null;
     birthDate: string | null;
     cardExpiryDate: string | null;
-    /** Full number. Decrypted for this call only, and audited. */
-    citizenId: string | null;
     phone: string | null;
     email: string | null;
     callsign: string | null;
@@ -99,12 +103,16 @@ export interface AdminDetail {
 
 export interface AdminViewService {
   list(query?: ApplicationListQuery): Promise<AdminListItem[]>;
+  /** Everything except the citizen ID, and nothing is decrypted. */
+  detail(applicationId: string): Promise<AdminDetail>;
   /**
-   * The full record, decrypting the citizen ID and recording that it was read.
+   * Decrypts the citizen ID and records that it was read.
    *
    * `actor` is the manager's Access identity, so the trail says who looked.
+   * Returns null when the envelope cannot be read, which is reported to the
+   * manager rather than failing the page.
    */
-  detail(applicationId: string, actor: string): Promise<AdminDetail>;
+  revealCitizenId(applicationId: string, actor: string): Promise<string | null>;
 }
 
 function fullName(record: ApplicationRecord): string | null {
@@ -150,7 +158,7 @@ export function createAdminView(
       }));
     },
 
-    async detail(applicationId, actor) {
+    async detail(applicationId) {
       const application = await db.applications.findById(applicationId);
       if (!application) throw adminApplicationNotFound();
 
@@ -161,22 +169,6 @@ export function createAdminView(
         db.events.listByApplicationId(applicationId),
         workflow.inspect(applicationId),
       ]);
-
-      // Decrypting is the sensitive act, so it is recorded before the value is
-      // used. An envelope that cannot be read leaves the field null rather than
-      // failing the page: the manager still needs everything else.
-      let plainCitizenId: string | null;
-      try {
-        plainCitizenId = await citizenId.decrypt(application.citizenIdCiphertext);
-        await audit.record({
-          applicationId,
-          eventType: CITIZEN_ID_ACCESSED_EVENT,
-          actorType: 'MANAGER',
-          actorId: actor,
-        });
-      } catch {
-        plainCitizenId = null;
-      }
 
       const payment = latestVerified(payments);
       const plan = application.membershipType ? membershipPlan(application.membershipType) : null;
@@ -193,7 +185,6 @@ export function createAdminView(
           lastNameEn: application.lastNameEn,
           birthDate: application.birthDate,
           cardExpiryDate: application.cardExpiryDate,
-          citizenId: plainCitizenId,
           phone: application.phone,
           email: application.email,
           callsign: application.callsign,
@@ -227,6 +218,29 @@ export function createAdminView(
         workflow: report,
         events,
       };
+    },
+
+    async revealCitizenId(applicationId, actor) {
+      const application = await db.applications.findById(applicationId);
+      if (!application) throw adminApplicationNotFound();
+
+      // The event is recorded before the value is returned, so a failure after
+      // the decrypt cannot leave a read unrecorded.
+      let plain: string;
+      try {
+        plain = await citizenId.decrypt(application.citizenIdCiphertext);
+      } catch {
+        return null;
+      }
+
+      await audit.record({
+        applicationId,
+        eventType: CITIZEN_ID_ACCESSED_EVENT,
+        actorType: 'MANAGER',
+        actorId: actor,
+      });
+
+      return plain;
     },
   };
 }
