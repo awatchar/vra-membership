@@ -236,11 +236,40 @@ describe('createIappOcrProvider', () => {
       const request = calls[0]!;
       expect(request.method).toBe('POST');
       expect(request.headers.get('apikey')).toBe('test-only-key');
+      expect(request.headers.get('content-type')).toMatch(/^multipart\/form-data; boundary=/);
       const form = await request.formData();
-      expect(form.get('file')).toBeInstanceOf(Blob);
+      const file = form.get('file');
+      expect(file).toBeInstanceOf(File);
+      if (!(file instanceof File)) throw new Error('expected multipart file');
+      expect(file.name).toBe('front.jpg');
+      expect(file.type).toBe('image/jpeg');
+      expect(new Uint8Array(await file.arrayBuffer())).toEqual(image.bytes);
       // Extra crops and bounding boxes are data with no purpose here, so they
       // are not requested at all.
       expect(form.get('options')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it.each([
+    ['image/jpeg', 'front.jpg'],
+    ['image/png', 'front.png'],
+    ['image/webp', 'front.webp'],
+  ])('matches the neutral upload filename to %s', async (contentType, expectedFilename) => {
+    const { provider, calls, restore } = providerWith(
+      () => new Response(JSON.stringify(IAPP_RESPONSE), { status: 200 }),
+    );
+
+    try {
+      await provider.readThaiIdCardFront({ ...image, contentType });
+
+      const form = await calls[0]!.formData();
+      const file = form.get('file');
+      expect(file).toBeInstanceOf(File);
+      if (!(file instanceof File)) throw new Error('expected multipart file');
+      expect(file.name).toBe(expectedFilename);
+      expect(file.type).toBe(contentType);
     } finally {
       restore();
     }
