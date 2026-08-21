@@ -23,21 +23,22 @@ pwsh -File ./scripts/set-production-secrets.ps1 -WhatIf
 pwsh -File ./scripts/set-production-secrets.ps1
 ```
 
-| Secret                                                       | ได้จากไหน                                                      |
-| ------------------------------------------------------------ | -------------------------------------------------------------- |
-| `IAPP_API_KEY`                                               | บัญชี iApp                                                     |
-| `SLIPOK_API_KEY`                                             | บัญชี SlipOK                                                   |
-| `SLIPOK_BRANCH_ID`                                           | SlipOK — branch id ที่อยู่ใน endpoint path                     |
-| `RESEND_API_KEY`                                             | บัญชี Resend                                                   |
-| `RESEND_WEBHOOK_SECRET`                                      | Resend → Webhooks → signing secret                             |
-| `TURNSTILE_SECRET_KEY`                                       | Cloudflare → Turnstile → widget ที่สร้างใหม่                   |
-| `PII_ENCRYPTION_KEY`                                         | ปล่อยว่างไว้ สคริปต์สร้างให้                                   |
-| `MANAGER_EMAIL`                                              | email ผู้จัดการสมาคม                                           |
-| `EMAIL_FROM`                                                 | sender ของ transactional email                                 |
-| `VRA_BANK_NAME`, `VRA_BANK_ACCOUNT`, `VRA_BANK_ACCOUNT_NAME` | ข้อมูลบัญชีสมาคม                                               |
-| `EMAIL_FROM_TRACKED` (ไม่บังคับ)                             | sender แยกสำหรับ open tracking — ดูข้อ 2                       |
-| `CF_ACCESS_TEAM_DOMAIN`                                      | Cloudflare Zero Trust → Settings → team domain                 |
-| `CF_ACCESS_AUD`                                              | Access application → Overview → Application Audience (AUD) tag |
+| Secret                                                       | ได้จากไหน                                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `IAPP_API_KEY`                                               | บัญชี iApp                                                                       |
+| `SLIPOK_API_KEY`                                             | บัญชี SlipOK                                                                     |
+| `SLIPOK_BRANCH_ID`                                           | SlipOK — branch id ที่อยู่ใน endpoint path                                       |
+| `RESEND_API_KEY`                                             | บัญชี Resend                                                                     |
+| `RESEND_WEBHOOK_SECRET`                                      | Resend → Webhooks → signing secret                                               |
+| `TURNSTILE_SECRET_KEY`                                       | Cloudflare → Turnstile → widget ที่สร้างใหม่                                     |
+| `TURNSTILE_SITE_KEY`                                         | Turnstile widget เดียวกัน — เป็นค่าสาธารณะ ระบบส่งให้ browser ผ่าน `/api/config` |
+| `PII_ENCRYPTION_KEY`                                         | ปล่อยว่างไว้ สคริปต์สร้างให้                                                     |
+| `MANAGER_EMAIL`                                              | email ผู้จัดการสมาคม                                                             |
+| `EMAIL_FROM`                                                 | sender ของ transactional email                                                   |
+| `VRA_BANK_NAME`, `VRA_BANK_ACCOUNT`, `VRA_BANK_ACCOUNT_NAME` | ข้อมูลบัญชีสมาคม                                                                 |
+| `EMAIL_FROM_TRACKED` (ไม่บังคับ)                             | sender แยกสำหรับ open tracking — ดูข้อ 2                                         |
+| `CF_ACCESS_TEAM_DOMAIN`                                      | Cloudflare Zero Trust → Settings → team domain                                   |
+| `CF_ACCESS_AUD`                                              | Access application → Overview → Application Audience (AUD) tag                   |
 
 > **`PII_ENCRYPTION_KEY` เปลี่ยนไม่ได้หลังมีข้อมูลจริง** ciphertext ของเลขบัตรและ hash ที่ใช้ค้นหาซ้ำ derive จาก key นี้ทั้งคู่ และไม่มีสำเนา plaintext เก็บไว้ที่ไหนเลย **สำรอง key ไว้ที่ปลอดภัยและออฟไลน์ก่อนลบไฟล์ค่า** ถ้า key หาย เลขบัตรทุกใบอ่านไม่ได้อีกเลย
 >
@@ -47,7 +48,9 @@ pwsh -File ./scripts/set-production-secrets.ps1
 
 ## 2. Cloudflare — การตั้งค่าอื่น
 
-- [ ] **Turnstile site** — สร้าง widget เก็บ secret key ไว้ใส่ในข้อ 1 ส่วน site key เป็นค่าสาธารณะที่จะใส่ใน client build (#17)
+- [ ] **Turnstile site** — สร้าง widget แล้วใส่ **ทั้งสองค่า** ในข้อ 1: `TURNSTILE_SECRET_KEY` และ `TURNSTILE_SITE_KEY`
+      site key เป็นค่าสาธารณะ แต่เก็บเป็น secret เหมือนกันเพราะ Worker ส่งให้ browser ผ่าน `GET /api/config` ตอน runtime — ทำให้เปลี่ยน widget ได้โดยไม่ต้อง rebuild และ CI ไม่ต้องรู้ค่านี้เลย
+      **ถ้าไม่ตั้ง `TURNSTILE_SITE_KEY`** browser จะไม่แสดง widget และไม่ส่ง token ซึ่งปลอดภัยเพราะฝั่ง server เป็นคนตัดสิน: `PROVIDER_MODE=live` ต้องมี secret และปฏิเสธคำขอที่ไม่มี token
 - [ ] **Custom domain** — ผูก `member.vra.or.th` เข้ากับ Worker `vra-membership` (`wrangler.jsonc` ประกาศ route ไว้แล้ว จะถูกสร้างตอน deploy ครั้งแรก แต่ DNS ต้องพร้อม)
 - [ ] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) แล้วคัดลอก **AUD tag** จากหน้า Overview ของ application ไปใส่ `CF_ACCESS_AUD` และ team domain ไปใส่ `CF_ACCESS_TEAM_DOMAIN` ในข้อ 1
       Worker ตรวจ JWT เองอีกชั้นด้วย ดังนั้น **ถ้าสอง secret นี้ยังไม่ได้ตั้ง ทุก admin endpoint จะปฏิเสธทุกคำขอ** ซึ่งเป็นพฤติกรรมที่ต้องการ — ไม่มีสถานะ "ยังไม่ตั้งค่าแล้วเข้าได้เลย"

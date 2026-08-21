@@ -9,7 +9,10 @@
   "include": [
     "src/worker/**/*.ts",
     "src/shared/**/*.ts",
-    "tests/**/*.ts",
+    "tests/worker/**/*.ts",
+    "tests/unit/**/*.ts",
+    "tests/support/**/*.ts",
+    "tests/setup/storage.ts",
     "worker-configuration.d.ts"
   ]
 }
