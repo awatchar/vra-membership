@@ -1,18 +1,21 @@
+import type { ReactNode } from 'react';
 import { Alert } from '../components/Alert';
 import { Button } from '../components/Button';
-import { CropBox } from '../components/CropBox';
 import { ImagePicker } from '../components/ImagePicker';
-import type { CropRegion } from '../lib/image';
 import type { HeldImage, WizardState } from '../state/wizard';
 
 /**
- * Choosing the member photo (Issue #1 sections 11, 12 and 61).
+ * Choosing the member photo (Issue #1 sections 11, 12 and 61; owner update #52).
  *
  * The card's face image is offered, never assumed. Selecting it reveals a
  * separate consent checkbox, and the submit button stays disabled until that box
  * is ticked - section 61 forbids using the face from the card without the
  * applicant knowing. Switching to an upload clears the consent, so it can never
  * apply to a choice that was undone.
+ *
+ * The selected frame is previewed and sent whole. Issue #52 deliberately
+ * removes the crop control for both sources; proportional downscaling may make
+ * a large upload smaller but never removes pixels from its edges.
  *
  * The three-item checklist is the section 12 confirmation. It is three boxes
  * rather than one because "I confirm this photo is suitable" is a box people tick
@@ -22,35 +25,35 @@ import type { HeldImage, WizardState } from '../state/wizard';
 
 export interface PhotoStepProps {
   state: WizardState;
-  region: CropRegion;
   busy: boolean;
   error: string | null;
+  readyForHumanCheck: boolean;
   canSubmit: boolean;
   onChooseSource: (source: 'ID_CARD' | 'UPLOAD') => void;
   onConsentChange: (accepted: boolean) => void;
   onUpload: (file: File) => void;
-  onRegionChange: (region: CropRegion) => void;
   onChecklistChange: (values: Partial<WizardState['photoChecklist']>) => void;
   onSubmit: () => void;
+  turnstileSlot: ReactNode;
 }
 
-/** The image the crop control is working on, whichever source was chosen. */
+/** The full image selected for storage, whichever source was chosen. */
 function sourceImage(state: WizardState): HeldImage | null {
   return state.photoSource === 'ID_CARD' ? state.faceImage : state.uploadedPhoto;
 }
 
 export function PhotoStep({
   state,
-  region,
   busy,
   error,
+  readyForHumanCheck,
   canSubmit,
   onChooseSource,
   onConsentChange,
   onUpload,
-  onRegionChange,
   onChecklistChange,
   onSubmit,
+  turnstileSlot,
 }: PhotoStepProps) {
   const image = sourceImage(state);
   const checklist = state.photoChecklist;
@@ -110,22 +113,13 @@ export function PhotoStep({
 
       {image ? (
         <>
-          <h2 className="vra-subheading">ปรับกรอบรูป</h2>
-          <p className="vra-muted">
-            รูปบัตรสมาชิกเป็นสี่เหลี่ยมจัตุรัส เลื่อนกรอบให้ใบหน้าอยู่กลางภาพ
-          </p>
-          <CropBox imageUrl={image.previewUrl} region={region} onChange={onRegionChange} />
-        </>
-      ) : null}
-
-      {state.croppedPhoto ? (
-        <>
           <h2 className="vra-subheading">ตรวจสอบก่อนยืนยัน</h2>
           <img
             className="vra-photo-preview"
-            src={state.croppedPhoto.previewUrl}
+            src={image.previewUrl}
             alt="ตัวอย่างรูปสำหรับบัตรสมาชิกที่เลือกไว้"
           />
+          <p className="vra-muted">ระบบจะส่งรูปเต็มตามที่แสดง โดยไม่ครอบตัดรูป</p>
 
           <fieldset className="vra-fieldset">
             <legend className="vra-field__label">กรุณายืนยันทุกข้อ</legend>
@@ -156,6 +150,8 @@ export function PhotoStep({
           </fieldset>
         </>
       ) : null}
+
+      {readyForHumanCheck ? turnstileSlot : null}
 
       <Button onClick={onSubmit} disabled={!canSubmit} busy={busy} busyLabel="กำลังบันทึกรูป...">
         ยืนยันรูปนี้

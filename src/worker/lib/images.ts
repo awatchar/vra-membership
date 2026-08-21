@@ -6,9 +6,9 @@ import type { SupportedImageType } from './files';
  *
  * A Worker has no canvas and no image decoder, and adding a WASM one would cost
  * bundle size and CPU on every upload for a service handling one or two
- * applications a day. So the split is: the browser crops and re-encodes to the
- * target shape (Issue #1 sections 11-12), and the Worker verifies the result
- * rather than trusting it.
+ * applications a day. So the split is: the browser proportionally downsizes
+ * and re-encodes large uploads, while the Worker verifies the full selected
+ * frame rather than trusting it (owner decision #52).
  *
  * Verification reads the pixel dimensions straight out of the container header,
  * which needs no decoder, and strips the metadata segments that carry the data
@@ -29,7 +29,6 @@ const MESSAGES = {
   undecodable: 'ไม่สามารถอ่านขนาดของภาพได้ กรุณาเลือกภาพใหม่',
   tooSmall: 'ภาพมีความละเอียดต่ำเกินไปสำหรับใช้ทำบัตรสมาชิก กรุณาใช้ภาพที่ใหญ่ขึ้น',
   tooLarge: 'ภาพมีความละเอียดสูงเกินกำหนด กรุณาย่อขนาดภาพ',
-  aspect: 'สัดส่วนภาพไม่ถูกต้อง กรุณาครอบตัดภาพเป็นสัดส่วน 3:4 ก่อนส่ง',
 } as const;
 
 /* ------------------------------------------------------- dimensions ------- */
@@ -211,14 +210,13 @@ export function hasJpegMetadata(bytes: Uint8Array): boolean {
 /* ------------------------------------------------------- validation ------- */
 
 /**
- * Target shape for a member photo (Issue #1 section 11).
+ * Safe pixel bounds for a member photo.
  *
- * The aspect tolerance exists because a browser crop lands on whole pixels, so
- * an exact 0.75 is not reachable at every size.
+ * The owner decision in Issue #52 keeps the applicant's full frame rather than
+ * enforcing a crop or aspect ratio. Dimension and byte limits still bound
+ * storage, memory and print quality.
  */
-export const MEMBER_PHOTO_SHAPE = {
-  aspectRatio: 3 / 4,
-  aspectTolerance: 0.02,
+export const MEMBER_PHOTO_LIMITS = {
   minWidth: 300,
   minHeight: 400,
   maxWidth: 2400,
@@ -234,7 +232,7 @@ export interface VerifiedMemberPhoto {
 }
 
 /**
- * Verifies the shape of a member photo and removes its metadata.
+ * Verifies the dimensions and encoding of a member photo and removes metadata.
  *
  * Throws `ApiError` with an applicant-safe message; each one says what to do,
  * because "invalid image" leaves the applicant with no next step.
@@ -249,22 +247,17 @@ export function verifyMemberPhoto(
   }
 
   if (
-    dimensions.width < MEMBER_PHOTO_SHAPE.minWidth ||
-    dimensions.height < MEMBER_PHOTO_SHAPE.minHeight
+    dimensions.width < MEMBER_PHOTO_LIMITS.minWidth ||
+    dimensions.height < MEMBER_PHOTO_LIMITS.minHeight
   ) {
     throw new ApiError('VALIDATION_FAILED', MESSAGES.tooSmall);
   }
 
   if (
-    dimensions.width > MEMBER_PHOTO_SHAPE.maxWidth ||
-    dimensions.height > MEMBER_PHOTO_SHAPE.maxHeight
+    dimensions.width > MEMBER_PHOTO_LIMITS.maxWidth ||
+    dimensions.height > MEMBER_PHOTO_LIMITS.maxHeight
   ) {
     throw new ApiError('VALIDATION_FAILED', MESSAGES.tooLarge);
-  }
-
-  const ratio = dimensions.width / dimensions.height;
-  if (Math.abs(ratio - MEMBER_PHOTO_SHAPE.aspectRatio) > MEMBER_PHOTO_SHAPE.aspectTolerance) {
-    throw new ApiError('VALIDATION_FAILED', MESSAGES.aspect);
   }
 
   if (contentType !== 'image/jpeg') {

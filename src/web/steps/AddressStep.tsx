@@ -24,6 +24,9 @@ export interface AddressStepProps {
   fromOcr: boolean;
   onChange: (values: Partial<AddressValues>) => void;
   onSubmit: () => void;
+  confirmingSameAddress: boolean;
+  onCancelSameAddress: () => void;
+  onConfirmSameAddress: () => void;
 }
 
 export function AddressStep({
@@ -34,6 +37,9 @@ export function AddressStep({
   fromOcr,
   onChange,
   onSubmit,
+  confirmingSameAddress,
+  onCancelSameAddress,
+  onConfirmSameAddress,
 }: AddressStepProps) {
   return (
     <form
@@ -151,6 +157,37 @@ export function AddressStep({
       <Button type="submit" busy={busy} busyLabel="กำลังบันทึก...">
         ถัดไป
       </Button>
+
+      {confirmingSameAddress ? (
+        <div
+          className="vra-dialog-backdrop"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onCancelSameAddress();
+          }}
+        >
+          <section
+            className="vra-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="same-address-confirmation-title"
+            aria-describedby="same-address-confirmation-description"
+          >
+            <h2 id="same-address-confirmation-title" className="vra-subheading">
+              ยืนยันที่อยู่จัดส่งเอกสาร
+            </h2>
+            <p id="same-address-confirmation-description">
+              เอกสารจะถูกส่งไปยังที่อยู่ตามบัตรประชาชนด้านบน โดยใช้รหัสไปรษณีย์ที่คุณกรอก
+              กรุณาตรวจสอบอีกครั้งก่อนยืนยัน
+            </p>
+            <div className="vra-dialog__actions">
+              <Button variant="secondary" onClick={onCancelSameAddress} autoFocus>
+                ยกเลิก
+              </Button>
+              <Button onClick={onConfirmSameAddress}>ยืนยันใช้ที่อยู่ตามบัตร</Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </form>
   );
 }

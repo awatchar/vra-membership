@@ -140,7 +140,7 @@ describe('the member photo', () => {
     ...INITIAL_STATE,
     step: 'photo',
     faceImage: image('face'),
-    croppedPhoto: image('crop'),
+    uploadedPhoto: image('upload'),
     photoChecklist: { clearFace: true, noHat: true, recent: true },
   };
 
@@ -184,8 +184,9 @@ describe('the member photo', () => {
     ).toBe(true);
   });
 
-  it('needs a cropped image, not only a chosen source', () => {
-    expect(canSubmitPhoto({ ...ready, photoSource: 'UPLOAD', croppedPhoto: null })).toBe(false);
+  it('needs the full image for the chosen source', () => {
+    expect(canSubmitPhoto({ ...ready, photoSource: 'UPLOAD', uploadedPhoto: null })).toBe(false);
+    expect(canSubmitPhoto({ ...ready, photoSource: 'ID_CARD', faceImage: null })).toBe(false);
   });
 
   it('invalidates a stored photo when a new one is chosen', () => {

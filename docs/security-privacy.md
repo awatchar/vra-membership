@@ -40,7 +40,7 @@ CSRF protection ใน #8 (origin check + double-submit token) กัน cross-s
 
 ### จุดที่ต้องรู้ก่อนแก้ policy
 
-**inline style ของ React ไม่ถูกกระทบ** `style={{...}}` ถูกใช้ผ่าน CSSOM (`node.style.width = …`) และ CSP ควบคุม style _attribute_ กับ `<style>` ที่ parse จาก markup ไม่ใช่การเปลี่ยน style ด้วยโปรแกรม จึงใช้ `style-src 'self'` ได้โดยไม่ต้องยกเว้นให้ progress bar หรือกรอบ crop (ยืนยันในเบราว์เซอร์จริงแล้ว: `style.width` เป็น `11%` และไม่มี CSP violation)
+**inline style ของ React ไม่ถูกกระทบ** `style={{...}}` ถูกใช้ผ่าน CSSOM (`node.style.width = …`) และ CSP ควบคุม style _attribute_ กับ `<style>` ที่ parse จาก markup ไม่ใช่การเปลี่ยน style ด้วยโปรแกรม จึงใช้ `style-src 'self'` ได้โดยไม่ต้องยกเว้นให้ progress bar (ยืนยันในเบราว์เซอร์จริงแล้ว: `style.width` เป็น `11%` และไม่มี CSP violation)
 
 **Turnstile ต้องการแค่สองอย่าง** `script-src` และ `frame-src` ของ `https://challenges.cloudflare.com` ตามเอกสาร Cloudflare ไม่ต้องมี inline allowance
 
