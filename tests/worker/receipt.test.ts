@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument } from 'pdf-lib';
 import { THAI_FONT_BYTES } from '../../src/worker/lib/pdf/fonts';
+import disabledPng from '../../src/worker/lib/pdf/png-disabled';
 import { renderReceiptPdf } from '../../src/worker/lib/pdf/receipt';
+import { Font as DisabledStandardFont } from '../../src/worker/lib/pdf/standard-fonts-disabled';
 import { createAuditLog } from '../../src/worker/services/audit';
 import { createNumberingService } from '../../src/worker/services/numbering';
 import { createReceiptService } from '../../src/worker/services/receipt';
@@ -192,6 +194,14 @@ describe('renderReceiptPdf', () => {
     await expect(
       renderReceiptPdf({ ...data, amountBaht: '2,000.00', membershipLabel: 'สมาชิกสามัญตลอดชีพ' }),
     ).resolves.toBeDefined();
+  });
+
+  it('fails closed if a future receipt tries to use a built-in PDF font', () => {
+    expect(() => DisabledStandardFont.load()).toThrow(/built-in PDF fonts/i);
+  });
+
+  it('fails closed if a future receipt tries to embed a PNG', () => {
+    expect(() => disabledPng.decode()).toThrow(/PNG embedding is disabled/i);
   });
 });
 
