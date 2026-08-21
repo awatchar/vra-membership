@@ -94,4 +94,9 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
     rules: { '@typescript-eslint/no-unsafe-assignment': 'off' },
   },
+  {
+    // A build-time script, run by hand to derive a committed asset.
+    files: ['scripts/**/*.ts'],
+    languageOptions: { globals: globals.node },
+  },
 );

@@ -48,7 +48,17 @@
   "vars": {
     "ENVIRONMENT": "development",
     "PROVIDER_MODE": "mock",
-    "APP_BASE_URL": "http://localhost:8787"
+    "APP_BASE_URL": "http://localhost:8787",
+    // The association's own contact details, shown in the site footer. These are
+    // public information the owner has confirmed may be published, so they live
+    // here as reviewable defaults rather than as secrets - there is nothing to
+    // keep. Overriding any of them in the Cloudflare dashboard takes effect
+    // without a code change.
+    "ASSOCIATION_NAME": "สมาคมนักวิทยุอาสาสมัคร",
+    "ASSOCIATION_POSTAL_ADDRESS": "ตู้ ปณ.1 ปณฝ.บางแค 10161",
+    "ASSOCIATION_EMAIL": "turakanvra@gmail.com",
+    "ASSOCIATION_LINE_ID": "vra2557",
+    "ASSOCIATION_PHONE": "098 832 2522"
   },
   "d1_databases": [
     {
@@ -81,7 +91,17 @@
       "vars": {
         "ENVIRONMENT": "production",
         "PROVIDER_MODE": "live",
-        "APP_BASE_URL": "https://member.vra.or.th"
+        "APP_BASE_URL": "https://member.vra.or.th",
+        // The association's own contact details, shown in the site footer. These are
+        // public information the owner has confirmed may be published, so they live
+        // here as reviewable defaults rather than as secrets - there is nothing to
+        // keep. Overriding any of them in the Cloudflare dashboard takes effect
+        // without a code change.
+        "ASSOCIATION_NAME": "สมาคมนักวิทยุอาสาสมัคร",
+        "ASSOCIATION_POSTAL_ADDRESS": "ตู้ ปณ.1 ปณฝ.บางแค 10161",
+        "ASSOCIATION_EMAIL": "turakanvra@gmail.com",
+        "ASSOCIATION_LINE_ID": "vra2557",
+        "ASSOCIATION_PHONE": "098 832 2522"
       },
       "d1_databases": [
         {

@@ -59,6 +59,10 @@ pwsh -File ./scripts/set-production-secrets.ps1
 - [x] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
 - [x] **Resend — sending domain และ webhook** — verify `member.vra.or.th` ใน region Tokyo แล้ว เพิ่ม endpoint `https://member.vra.or.th/api/webhooks/resend` พร้อม event `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced` และเก็บ signing secret ใน Worker แล้ว
       ระบบตอบ 2xx ให้ event ที่ไม่ได้เลือกด้วย จึงเลือกเพิ่มได้โดยไม่พัง แต่ **การเปลี่ยนสถานะใบสมัครอาศัย `email.opened`** ถ้าไม่เลือก ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" เอง
+- [ ] **ข้อมูลติดต่อใน footer (ไม่ต้องทำอะไร เว้นแต่จะเปลี่ยน)** — ชื่อสมาคม ที่อยู่ตู้ ปณ. อีเมล LINE ID และเบอร์ผู้จัดการ commit ไว้เป็นค่าตั้งต้นใน `vars` ของ `wrangler.jsonc` แล้ว footer จึงขึ้นครบตั้งแต่ deploy แรก
+      ถ้าค่าใดเปลี่ยน แก้ได้สองทาง: แก้ `wrangler.jsonc` แล้ว deploy หรือแก้ variable ชื่อเดียวกัน (`ASSOCIATION_NAME`, `ASSOCIATION_POSTAL_ADDRESS`, `ASSOCIATION_EMAIL`, `ASSOCIATION_LINE_ID`, `ASSOCIATION_PHONE`) ใน Cloudflare dashboard ซึ่งมีผลทันทีโดยไม่ต้องแก้โค้ด
+      ค่าที่ตั้งเป็นค่าว่างจะไม่ขึ้นบรรทัดนั้นใน footer เลย ไม่ขึ้นแถวว่างและไม่ขึ้นค่าตัวอย่าง
+
 - [ ] **Resend — open tracking แยก sender (ไม่บังคับ)** — Resend เปิด open tracking ที่ระดับ domain ไม่มี field ต่อ message ถ้าเปิดบน domain ที่ส่งอีเมลสมาชิก อีเมลสมาชิกจะถูก track ด้วย ซึ่งขัดกับข้อกำหนดที่ให้ track เฉพาะอีเมลผู้จัดการ วิธีที่ตรงตามข้อกำหนดคือ verify subdomain แยก (เช่น `notify.vra.or.th`) เปิด open tracking บน subdomain นั้น แล้วใส่เป็น `EMAIL_FROM_TRACKED`
       **ถ้าไม่ทำ** ระบบยังทำงานครบ เพียงแต่การที่ผู้จัดการเปิดอีเมลจะไม่ขยับสถานะใบสมัครเอง ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" ซึ่งมีอยู่ในอีเมลและในระบบผู้จัดการแล้ว
 - [x] **API token สำหรับ CI** — สร้างแบบ least privilege: Account — Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้; Zone — Workers Routes Edit เฉพาะ `vra.or.th` ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning

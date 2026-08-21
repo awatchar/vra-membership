@@ -1,0 +1,138 @@
+/*
+ * Site header and footer.
+ *
+ * Shared by the applicant wizard and the manager portal, because they are the
+ * same association and a visitor should not be able to tell they are two
+ * applications.
+ *
+ * The page is a column with the footer pushed to the bottom, so a short step -
+ * the confirmation, say - does not leave the contact details floating in the
+ * middle of the viewport.
+ */
+
+.vra-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.vra-page > main {
+  flex: 1;
+}
+
+/* ----------------------------------------------------------------- header --- */
+
+.vra-site-header {
+  align-items: center;
+  background: var(--vra-surface);
+  border-bottom: 1px solid var(--vra-border);
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+}
+
+.vra-site-header__logo {
+  flex: none;
+  height: 2.5rem;
+  width: 2.5rem;
+}
+
+.vra-site-header__text {
+  min-width: 0;
+}
+
+.vra-site-header__name {
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.vra-site-header__subtitle {
+  color: var(--vra-text-muted);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.vra-site-header__aside {
+  color: var(--vra-text-muted);
+  font-size: 0.8125rem;
+  /* Pushed right, and allowed to wrap under on a narrow screen rather than
+     squeezing the association's name. */
+  margin-left: auto;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+/* ----------------------------------------------------------------- footer --- */
+
+.vra-site-footer {
+  background: var(--vra-surface);
+  border-top: 1px solid var(--vra-border);
+  margin-top: 2rem;
+  padding: 1.25rem 1rem 2rem;
+}
+
+.vra-site-footer__name {
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.vra-site-footer__details {
+  margin: 0;
+}
+
+.vra-site-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0.1875rem 0;
+}
+
+.vra-site-footer__row dt {
+  color: var(--vra-text-muted);
+  /* Wide enough for the longest label, so the values line up. */
+  flex: none;
+  min-width: 5rem;
+}
+
+.vra-site-footer__row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vra-site-footer a {
+  color: var(--vra-navy);
+}
+
+.vra-site-footer__note {
+  color: var(--vra-text-muted);
+  font-size: 0.8125rem;
+  margin: 0.875rem 0 0;
+}
+
+@media (min-width: 40rem) {
+  .vra-site-header {
+    padding: 0.75rem 1.5rem;
+  }
+
+  .vra-site-header__logo {
+    height: 3rem;
+    width: 3rem;
+  }
+
+  .vra-site-footer {
+    padding: 1.5rem 1.5rem 2.5rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  /*
+     The logo is a yellow shield on transparency, which reads on both themes -
+     but on the dark surface its thin outline loses contrast, so it gets a
+     little breathing room rather than a filled plate behind it.
+  */
+  .vra-site-header__logo {
+    filter: drop-shadow(0 0 1px rgb(255 255 255 / 35%));
+  }
+}

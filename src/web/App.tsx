@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ApiRequestError, api } from './api/client';
-import type { PublicConfig } from './api/types';
+import type { AssociationContact, PublicConfig } from './api/types';
 import { Alert } from './components/Alert';
 import { Button } from './components/Button';
+import { SiteFooter } from './components/SiteFooter';
+import { SiteHeader } from './components/SiteHeader';
 import { StepFrame } from './components/StepFrame';
 import { TurnstileGate } from './components/TurnstileGate';
 import { base64ToBlob, centredSquare, cropToSquare, downscale } from './lib/image';
@@ -48,6 +50,20 @@ import { PrivacyStep } from './steps/PrivacyStep';
  * double-tap.
  */
 
+/**
+ * Shown before `/api/config` answers, and if it never does.
+ *
+ * Only the name, because that is the one field the header cannot do without.
+ * The contact rows stay empty rather than guessing at a phone number.
+ */
+const FALLBACK_ASSOCIATION: AssociationContact = {
+  name: 'สมาคมนักวิทยุอาสาสมัคร',
+  postalAddress: null,
+  email: null,
+  lineId: null,
+  phone: null,
+};
+
 /** Blob plus its preview URL, tracked together so the URL can be revoked. */
 function hold(blob: Blob): HeldImage {
   return { blob, previewUrl: URL.createObjectURL(blob) };
@@ -92,7 +108,13 @@ export function App() {
       .then(setConfig)
       // A missing config is not fatal: no site key means no widget, and the
       // server still decides whether a token was required.
-      .catch(() => setConfig({ turnstileSiteKey: null, environment: 'unknown' }));
+      .catch(() =>
+        setConfig({
+          turnstileSiteKey: null,
+          environment: 'unknown',
+          association: FALLBACK_ASSOCIATION,
+        }),
+      );
     return () => controller.abort();
   }, []);
 
@@ -343,129 +365,140 @@ export function App() {
 
   const back = previousStep(state);
 
+  // Until `/api/config` answers, the name falls back to the constant rather
+  // than rendering an empty header - a page that briefly claims to belong to
+  // nobody is worse than one that is momentarily generic.
+  const association = config?.association ?? FALLBACK_ASSOCIATION;
+
   return (
-    <main className="vra-main">
-      <StepFrame
-        step={state.step}
-        headingRef={headingRef}
-        footer={
-          back ? (
-            <Button
-              variant="quiet"
-              onClick={() => dispatch({ type: 'GO_TO', step: back })}
-              disabled={busy}
-            >
-              ย้อนกลับ
-            </Button>
-          ) : null
-        }
-      >
-        {state.step === 'privacy' ? (
-          <PrivacyStep onAccept={() => dispatch({ type: 'ACCEPT_PRIVACY' })} />
-        ) : null}
+    <div className="vra-page">
+      <SiteHeader associationName={association.name} subtitle="ระบบรับสมัครสมาชิก" />
 
-        {state.step === 'card' ? (
-          <CardStep
-            busy={busy}
-            error={error}
-            onSelect={(file) => void readCard(file)}
-            onManualEntry={() => dispatch({ type: 'CHOOSE_MANUAL_ENTRY' })}
-            turnstileSlot={gate('ocr')}
-          />
-        ) : null}
+      <main className="vra-main">
+        <StepFrame
+          step={state.step}
+          headingRef={headingRef}
+          footer={
+            back ? (
+              <Button
+                variant="quiet"
+                onClick={() => dispatch({ type: 'GO_TO', step: back })}
+                disabled={busy}
+              >
+                ย้อนกลับ
+              </Button>
+            ) : null
+          }
+        >
+          {state.step === 'privacy' ? (
+            <PrivacyStep onAccept={() => dispatch({ type: 'ACCEPT_PRIVACY' })} />
+          ) : null}
 
-        {state.step === 'identity' ? (
-          <IdentityStep
-            values={state.identity}
-            errors={identityErrors}
-            fromOcr={state.ocrCompleted}
-            busy={busy}
-            submitError={error}
-            duplicateWarning={state.hasPreviousApplication}
-            onChange={(values) => dispatch({ type: 'SET_IDENTITY', values })}
-            onSubmit={submitIdentity}
-            turnstileSlot={gate('application')}
-          />
-        ) : null}
+          {state.step === 'card' ? (
+            <CardStep
+              busy={busy}
+              error={error}
+              onSelect={(file) => void readCard(file)}
+              onManualEntry={() => dispatch({ type: 'CHOOSE_MANUAL_ENTRY' })}
+              turnstileSlot={gate('ocr')}
+            />
+          ) : null}
 
-        {state.step === 'contact' ? (
-          <ContactStep
-            values={state.contact}
-            errors={contactErrors}
-            busy={busy}
-            submitError={error}
-            onChange={(values) => dispatch({ type: 'SET_CONTACT', values })}
-            onSubmit={submitContact}
-          />
-        ) : null}
+          {state.step === 'identity' ? (
+            <IdentityStep
+              values={state.identity}
+              errors={identityErrors}
+              fromOcr={state.ocrCompleted}
+              busy={busy}
+              submitError={error}
+              duplicateWarning={state.hasPreviousApplication}
+              onChange={(values) => dispatch({ type: 'SET_IDENTITY', values })}
+              onSubmit={submitIdentity}
+              turnstileSlot={gate('application')}
+            />
+          ) : null}
 
-        {state.step === 'address' ? (
-          <AddressStep
-            values={state.address}
-            errors={addressErrors}
-            busy={busy}
-            submitError={error}
-            fromOcr={state.ocrCompleted}
-            onChange={(values) => dispatch({ type: 'SET_ADDRESS', values })}
-            onSubmit={submitAddress}
-          />
-        ) : null}
+          {state.step === 'contact' ? (
+            <ContactStep
+              values={state.contact}
+              errors={contactErrors}
+              busy={busy}
+              submitError={error}
+              onChange={(values) => dispatch({ type: 'SET_CONTACT', values })}
+              onSubmit={submitContact}
+            />
+          ) : null}
 
-        {state.step === 'photo' ? (
-          <PhotoStep
-            state={state}
-            region={region}
-            busy={busy}
-            error={error}
-            canSubmit={canSubmitPhoto(state)}
-            onChooseSource={chooseSource}
-            onConsentChange={(accepted) => dispatch({ type: 'SET_ID_CARD_CONSENT', accepted })}
-            onUpload={(file) => void chooseUpload(file)}
-            onRegionChange={applyRegion}
-            onChecklistChange={(values) => dispatch({ type: 'SET_PHOTO_CHECKLIST', values })}
-            onSubmit={submitPhoto}
-          />
-        ) : null}
+          {state.step === 'address' ? (
+            <AddressStep
+              values={state.address}
+              errors={addressErrors}
+              busy={busy}
+              submitError={error}
+              fromOcr={state.ocrCompleted}
+              onChange={(values) => dispatch({ type: 'SET_ADDRESS', values })}
+              onSubmit={submitAddress}
+            />
+          ) : null}
 
-        {state.step === 'membership' ? (
-          <MembershipStep
-            selected={state.membershipType}
-            busy={busy}
-            error={error}
-            onSelect={(membershipType) => dispatch({ type: 'CHOOSE_MEMBERSHIP', membershipType })}
-            onSubmit={submitMembership}
-          />
-        ) : null}
+          {state.step === 'photo' ? (
+            <PhotoStep
+              state={state}
+              region={region}
+              busy={busy}
+              error={error}
+              canSubmit={canSubmitPhoto(state)}
+              onChooseSource={chooseSource}
+              onConsentChange={(accepted) => dispatch({ type: 'SET_ID_CARD_CONSENT', accepted })}
+              onUpload={(file) => void chooseUpload(file)}
+              onRegionChange={applyRegion}
+              onChecklistChange={(values) => dispatch({ type: 'SET_PHOTO_CHECKLIST', values })}
+              onSubmit={submitPhoto}
+            />
+          ) : null}
 
-        {state.step === 'payment' && state.instructions ? (
-          <PaymentStep
-            instructions={state.instructions}
-            busy={busy}
-            reading={reading}
-            error={error}
-            qrPayload={state.slipQrPayload}
-            usedImageFallback={usedImageFallback}
-            onSlipSelected={readSlip}
-            onSubmit={submitPayment}
-            turnstileSlot={gate('payment')}
-          />
-        ) : null}
+          {state.step === 'membership' ? (
+            <MembershipStep
+              selected={state.membershipType}
+              busy={busy}
+              error={error}
+              onSelect={(membershipType) => dispatch({ type: 'CHOOSE_MEMBERSHIP', membershipType })}
+              onSubmit={submitMembership}
+            />
+          ) : null}
 
-        {state.step === 'confirmation' && state.confirmation ? (
-          <ConfirmationStep
-            report={state.confirmation}
-            busy={busy}
-            error={error}
-            onRetry={retryOutstanding}
-          />
-        ) : null}
+          {state.step === 'payment' && state.instructions ? (
+            <PaymentStep
+              instructions={state.instructions}
+              busy={busy}
+              reading={reading}
+              error={error}
+              qrPayload={state.slipQrPayload}
+              usedImageFallback={usedImageFallback}
+              onSlipSelected={readSlip}
+              onSubmit={submitPayment}
+              turnstileSlot={gate('payment')}
+            />
+          ) : null}
 
-        {state.step === 'payment' && !state.instructions ? (
-          <Alert tone="error">
-            <p>ไม่พบข้อมูลการชำระเงิน กรุณาย้อนกลับไปเลือกประเภทสมาชิกอีกครั้ง</p>
-          </Alert>
-        ) : null}
-      </StepFrame>
-    </main>
+          {state.step === 'confirmation' && state.confirmation ? (
+            <ConfirmationStep
+              report={state.confirmation}
+              busy={busy}
+              error={error}
+              onRetry={retryOutstanding}
+            />
+          ) : null}
+
+          {state.step === 'payment' && !state.instructions ? (
+            <Alert tone="error">
+              <p>ไม่พบข้อมูลการชำระเงิน กรุณาย้อนกลับไปเลือกประเภทสมาชิกอีกครั้ง</p>
+            </Alert>
+          ) : null}
+        </StepFrame>
+      </main>
+
+      <SiteFooter contact={association} />
+    </div>
   );
 }
