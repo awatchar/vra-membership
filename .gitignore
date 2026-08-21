@@ -18,7 +18,13 @@ coverage/
 # Local provider credentials and reference material.
 # The whole directory stays out of Git: it holds vendor credentials and guides
 # that must never be committed (see AGENTS.md).
-api/
+#
+# Anchored to the repository root with a leading slash. Written as `api/` it
+# matched *any* directory named `api` at any depth, which silently excluded
+# `src/web/api/` - the browser's whole API layer - from a commit. The build and
+# the tests passed locally because the files were on disk; a clean checkout had
+# no such directory at all.
+/api/
 
 # Editors and operating systems
 .DS_Store
