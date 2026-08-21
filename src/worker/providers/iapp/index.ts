@@ -36,6 +36,29 @@ const FRONT_ENDPOINT = 'https://api.iapp.co.th/v3/store/ekyc/thai-national-id-ca
 const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
+ * Gives the multipart part a neutral filename whose extension agrees with the
+ * validated content type. The original client filename is deliberately not
+ * available at this boundary: it may contain personal information, while some
+ * provider upload pipelines still use the extension to select an image
+ * decoder even when the part also has a Content-Type header.
+ */
+function multipartFilename(contentType: string): string {
+  switch (contentType) {
+    case 'image/jpeg':
+      return 'front.jpg';
+    case 'image/png':
+      return 'front.png';
+    case 'image/webp':
+      return 'front.webp';
+    default:
+      // The OCR route rejects unsupported magic bytes before this adapter is
+      // called. Keep an explicit non-image fallback so a future caller cannot
+      // make arbitrary bytes look like a JPEG merely through its filename.
+      return 'front.bin';
+  }
+}
+
+/**
  * Maps iApp HTTP status codes onto internal failure reasons.
  *
  * Anything unlisted becomes `PROVIDER_ERROR`, so a new code from the provider
@@ -170,7 +193,11 @@ export function createIappOcrProvider(options: IappOcrOptions): OcrProvider {
       // `get_bbox`, `get_image` and `get_original` are all left off: bounding
       // boxes and extra crops are data with no purpose here, and asking for
       // less is one fewer thing that could be stored by accident.
-      body.append('file', new Blob([image.bytes], { type: image.contentType }), 'front');
+      body.append(
+        'file',
+        new Blob([image.bytes], { type: image.contentType }),
+        multipartFilename(image.contentType),
+      );
 
       const timeout = AbortSignal.timeout(timeoutMs);
       let response: Response;
