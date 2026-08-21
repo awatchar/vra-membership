@@ -7,6 +7,7 @@ import type {
   ReceiptRecord,
   Repository,
 } from '../db';
+import { UniqueConstraintError } from '../db';
 import {
   displayName,
   managerNewApplicationEmail,
@@ -145,6 +146,21 @@ function dateLabel(value: string | null): string | null {
   const parsed = new Date(`${value}T00:00:00+07:00`);
   return Number.isNaN(parsed.getTime()) ? null : formatThaiDate(parsed);
 }
+
+/**
+ * Audit event name per email type.
+ *
+ * Issue #1 section 50 names each of these in the example trail, so the trail
+ * reads as a sequence of things that happened rather than four rows of
+ * `EMAIL_SENT` distinguished only by metadata. Failures stay generic: the
+ * specification does not name them, and the type is in the metadata either way.
+ */
+const SENT_EVENT_BY_TYPE: Readonly<Record<EmailType, string>> = {
+  RECEIPT: 'RECEIPT_EMAIL_SENT',
+  MANAGER_NEW_APPLICATION: 'MANAGER_EMAIL_SENT',
+  MEMBER_PROCESSING: 'MEMBER_PROCESSING_EMAIL_SENT',
+  MEMBER_NBTC_COMPLETED: 'MEMBER_COMPLETION_EMAIL_SENT',
+};
 
 function englishName(application: ApplicationRecord): string | null {
   const name = [application.firstNameEn, application.lastNameEn]
@@ -292,6 +308,21 @@ export function createEmailService(
     }
   };
 
+  /**
+   * Resolves a failed insert that was actually a lost race, or null when the
+   * failure was something else and must not be swallowed.
+   */
+  const concurrentWinner = async (
+    error: unknown,
+    applicationId: string,
+    type: EmailType,
+  ): Promise<EmailRecord | null> => {
+    if (!(error instanceof UniqueConstraintError)) return null;
+    if (!error.constraintName.includes('application_id')) return null;
+    const rows = await db.emails.findByApplicationIdAndType(applicationId, type);
+    return rows[0] ?? null;
+  };
+
   const dispatch = async (record: EmailRecord, prepared: Prepared): Promise<EmailOutcome> => {
     const result = await provider.send({
       to: prepared.recipient,
@@ -319,7 +350,7 @@ export function createEmailService(
     await db.emails.markSent(record.id, result.providerEmailId, now().toISOString());
     await audit.record({
       applicationId: record.applicationId,
-      eventType: 'EMAIL_SENT',
+      eventType: SENT_EVENT_BY_TYPE[record.type],
       actorType: 'SYSTEM',
       metadata: { emailType: record.type, provider: provider.name },
     });
@@ -350,12 +381,24 @@ export function createEmailService(
       return skip(applicationId, type, reason);
     }
 
-    const record = await db.emails.create({
-      applicationId,
-      type,
-      recipient: prepared.recipient,
-      provider: provider.name,
-    });
+    let record: EmailRecord;
+    try {
+      record = await db.emails.create({
+        applicationId,
+        type,
+        recipient: prepared.recipient,
+        provider: provider.name,
+      });
+    } catch (error) {
+      // Two callers both read "no email of this type yet" and both tried to
+      // create one; the unique index decided. The loser dispatches to the row
+      // that won, so both share one idempotency key and the recipient gets one
+      // message instead of two.
+      const raced = await concurrentWinner(error, applicationId, type);
+      if (!raced) throw error;
+      record = raced;
+    }
+
     return dispatch(record, prepared);
   };
 

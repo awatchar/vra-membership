@@ -1,4 +1,5 @@
 export * from './application';
+export * from './application-workflow';
 export * from './application-access';
 export * from './audit';
 export * from './email';
@@ -9,3 +10,4 @@ export * from './receipt';
 export * from './member-photo';
 export * from './numbering';
 export * from './state-machine';
+export * from './workflow-factory';

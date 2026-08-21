@@ -34,6 +34,12 @@ export default defineConfig(async () => {
             // `scripts/validate-repository.ps1`.
             RESEND_WEBHOOK_SECRET: 'whsec_testonlywebhooksecret123',
             MANAGER_EMAIL: 'manager@example.test',
+            // Invented account details. `receiverAccountDigits` from the mock
+            // slip provider is `1234`, which has to appear in order inside the
+            // configured account for the receiver check to pass.
+            VRA_BANK_ACCOUNT: '001234567890',
+            VRA_BANK_NAME: 'ธนาคารตัวอย่าง',
+            VRA_BANK_ACCOUNT_NAME: 'สมาคมนักวิทยุอาสาสมัคร (ตัวอย่าง)',
             EMAIL_FROM: 'VRA <membership@example.test>',
             TEST_MIGRATIONS: migrations,
           },
