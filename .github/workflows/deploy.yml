@@ -23,17 +23,19 @@ jobs:
     name: Quality gates
     uses: ./.github/workflows/quality.yml
 
-  deploy:
-    name: Deploy to production
+  delivery-gate:
+    name: Check production delivery gate
     needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Requires the protected GitHub `production` environment. Reviewers and
-    # secrets are configured there; see docs/deployment.md.
-    environment:
-      name: production
-      url: https://member.vra.or.th
+    timeout-minutes: 2
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
     steps:
+      # This check deliberately runs outside the protected environment. When
+      # delivery is disabled, a push must finish without asking a reviewer to
+      # approve a job that will only report "disabled". Putting the gate in the
+      # protected job also lets an old waiting run hold the concurrency group
+      # and block every newer deployment indefinitely.
       - name: Check whether production delivery is enabled
         id: gate
         env:
@@ -48,29 +50,39 @@ jobs:
               echo
               echo "Set the repository variable \`CLOUDFLARE_DEPLOY_ENABLED=true\` once the"
               echo "Cloudflare resources and environment secrets listed in"
-              echo "\`docs/deployment.md\` exist. Until then this job is a no-op."
+              echo "\`docs/deployment.md\` exist. Until then deployment is skipped."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  deploy:
+    name: Deploy to production
+    needs:
+      - quality
+      - delivery-gate
+    if: needs.delivery-gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Requires the protected GitHub `production` environment. Reviewers and
+    # secrets are configured there; see docs/deployment.md.
+    environment:
+      name: production
+      url: https://member.vra.or.th
+    steps:
       - name: Check out repository
-        if: steps.gate.outputs.enabled == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Node.js
-        if: steps.gate.outputs.enabled == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies from the lockfile
-        if: steps.gate.outputs.enabled == 'true'
         run: npm ci
 
       - name: Verify required deployment secrets are present
-        if: steps.gate.outputs.enabled == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -85,11 +97,9 @@ jobs:
           exit "$missing"
 
       - name: Build client bundle
-        if: steps.gate.outputs.enabled == 'true'
         run: npm run build:web
 
       - name: Apply D1 migrations
-        if: steps.gate.outputs.enabled == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -97,7 +107,6 @@ jobs:
 
       - name: Deploy worker
         id: worker
-        if: steps.gate.outputs.enabled == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -105,7 +114,6 @@ jobs:
 
       # Smoke test uses the health endpoint only: no PII, no provider calls.
       - name: Smoke test the deployment
-        if: steps.gate.outputs.enabled == 'true'
         run: |
           for attempt in 1 2 3 4 5; do
             status="$(curl -sS -o /tmp/health.json -w '%{http_code}' \
@@ -121,7 +129,6 @@ jobs:
           exit 1
 
       - name: Record the deployed revision
-        if: steps.gate.outputs.enabled == 'true'
         run: |
           {
             echo "### Deployed"

@@ -10,7 +10,7 @@ Pipeline ประกอบด้วยสาม workflow
 | [`ci.yml`](../.github/workflows/ci.yml)           | pull request, push `main`, manual | เรียก quality gates                                                   |
 | [`deploy.yml`](../.github/workflows/deploy.yml)   | push `main`, manual               | เรียก quality gates แล้ว deploy production                            |
 
-`deploy.yml` เรียก quality gates ชุดเดียวกับ CI และ job `deploy` มี `needs: quality` จึงไม่มีทางที่ commit จะขึ้น production โดยไม่ผ่าน gates เดียวกัน และใช้ GitHub environment ชื่อ `production` เพื่อบังคับ approval/secret scoping
+`deploy.yml` เรียก quality gates ชุดเดียวกับ CI แล้วตรวจ repository kill switch ใน job ที่ไม่ใช้ environment หาก delivery ปิด workflow จะจบโดยไม่ขอ approval หากเปิดแล้ว job `deploy` จึงเข้าสู่ GitHub environment `production` เพื่อบังคับ approval/secret scoping โครงสร้างนี้ป้องกัน run เก่าที่รอ approval กีดกัน push ใหม่โดยไม่จำเป็น
 
 ## One-time setup by the Cloudflare account owner
 
@@ -102,6 +102,8 @@ Pipeline ประกอบด้วยสาม workflow
 5. `wrangler deploy --env production`
 6. smoke test `GET https://member.vra.or.th/api/health` ต้องได้ HTTP 200 (endpoint นี้ไม่มี PII และไม่เรียก provider)
 7. บันทึก commit SHA และ URL ไว้ใน job summary
+
+8. Wrangler ติดตั้ง production Cron `17 19 * * *` UTC สำหรับ retention ตาม `docs/retention-policy.md`
 
 ## Rollback
 

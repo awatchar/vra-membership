@@ -56,13 +56,20 @@ export function PrivacyStep({ onAccept }: PrivacyStepProps) {
         ))}
       </dl>
 
+      <p>
+        อ่านรายละเอียดเรื่องวัตถุประสงค์ ผู้ให้บริการ ระยะเวลาเก็บข้อมูล และสิทธิของท่านได้ที่{' '}
+        <a href="/privacy" target="_blank" rel="noreferrer">
+          ประกาศความเป็นส่วนตัวฉบับเต็ม
+        </a>
+      </p>
+
       <label className="vra-checkbox">
         <input
           type="checkbox"
           checked={accepted}
           onChange={(event) => setAccepted(event.target.checked)}
         />
-        <span>ข้าพเจ้าอ่านและเข้าใจข้อความข้างต้น และยินยอมให้ดำเนินการตามที่ระบุ</span>
+        <span>ข้าพเจ้าอ่านและรับทราบประกาศความเป็นส่วนตัว และประสงค์เริ่มสมัครสมาชิก</span>
       </label>
 
       <Button onClick={onAccept} disabled={!accepted}>

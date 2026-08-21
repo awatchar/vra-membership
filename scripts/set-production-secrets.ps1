@@ -49,19 +49,25 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Name, whether a blank value can be generated, and what the value is for.
+# Name, whether a blank value can be generated, whether it is required for the
+# first live deployment, and what the value is for.
 $secrets = @(
-  @{ Name = 'IAPP_API_KEY'; Generate = $false; Purpose = 'iApp Thai national ID OCR' }
-  @{ Name = 'SLIPOK_API_KEY'; Generate = $false; Purpose = 'SlipOK payment slip verification' }
-  @{ Name = 'RESEND_API_KEY'; Generate = $false; Purpose = 'Resend transactional email' }
-  @{ Name = 'RESEND_WEBHOOK_SECRET'; Generate = $false; Purpose = 'Resend webhook signature check' }
-  @{ Name = 'TURNSTILE_SECRET_KEY'; Generate = $false; Purpose = 'Turnstile server-side verification' }
-  @{ Name = 'PII_ENCRYPTION_KEY'; Generate = $true; Purpose = 'Citizen ID encryption; NEVER change once data exists' }
-  @{ Name = 'MANAGER_EMAIL'; Generate = $false; Purpose = 'Recipient of the new-application email' }
-  @{ Name = 'EMAIL_FROM'; Generate = $false; Purpose = 'Sender address for member email' }
-  @{ Name = 'VRA_BANK_NAME'; Generate = $false; Purpose = 'Shown on the payment page and checked against the slip' }
-  @{ Name = 'VRA_BANK_ACCOUNT'; Generate = $false; Purpose = 'Shown on the payment page and checked against the slip' }
-  @{ Name = 'VRA_BANK_ACCOUNT_NAME'; Generate = $false; Purpose = 'Shown on the payment page and checked against the slip' }
+  @{ Name = 'IAPP_API_KEY'; Generate = $false; Required = $true; Purpose = 'iApp Thai national ID OCR' }
+  @{ Name = 'SLIPOK_API_KEY'; Generate = $false; Required = $true; Purpose = 'SlipOK payment slip verification' }
+  @{ Name = 'SLIPOK_BRANCH_ID'; Generate = $false; Required = $true; Purpose = 'SlipOK branch id used in the provider endpoint' }
+  @{ Name = 'RESEND_API_KEY'; Generate = $false; Required = $true; Purpose = 'Resend transactional email' }
+  @{ Name = 'RESEND_WEBHOOK_SECRET'; Generate = $false; Required = $true; Purpose = 'Resend webhook signature check' }
+  @{ Name = 'TURNSTILE_SECRET_KEY'; Generate = $false; Required = $true; Purpose = 'Turnstile server-side verification' }
+  @{ Name = 'TURNSTILE_SITE_KEY'; Generate = $false; Required = $true; Purpose = 'Turnstile public site key served at runtime' }
+  @{ Name = 'PII_ENCRYPTION_KEY'; Generate = $true; Required = $true; Purpose = 'Citizen ID encryption; NEVER change once data exists' }
+  @{ Name = 'MANAGER_EMAIL'; Generate = $false; Required = $true; Purpose = 'Recipient of the new-application email' }
+  @{ Name = 'EMAIL_FROM'; Generate = $false; Required = $true; Purpose = 'Sender address for member email' }
+  @{ Name = 'EMAIL_FROM_TRACKED'; Generate = $false; Required = $false; Purpose = 'Optional manager-only sender with open tracking enabled' }
+  @{ Name = 'VRA_BANK_NAME'; Generate = $false; Required = $true; Purpose = 'Shown on the payment page and checked against the slip' }
+  @{ Name = 'VRA_BANK_ACCOUNT'; Generate = $false; Required = $true; Purpose = 'Shown on the payment page and checked against the slip' }
+  @{ Name = 'VRA_BANK_ACCOUNT_NAME'; Generate = $false; Required = $true; Purpose = 'Shown on the payment page and checked against the slip' }
+  @{ Name = 'CF_ACCESS_TEAM_DOMAIN'; Generate = $false; Required = $true; Purpose = 'Cloudflare Access team domain used to verify admin JWTs' }
+  @{ Name = 'CF_ACCESS_AUD'; Generate = $false; Required = $true; Purpose = 'Cloudflare Access application audience tag' }
 )
 
 function New-EncryptionKey {
@@ -175,7 +181,7 @@ foreach ($secret in $secrets) {
     $values[$secret.Name] = New-EncryptionKey
     $generated.Add($secret.Name)
   }
-  else {
+  elseif ($secret.Required) {
     $missing.Add($secret.Name)
   }
 }
@@ -195,8 +201,9 @@ foreach ($name in $generated) {
   Write-Host '  from it, and no plaintext copy is kept anywhere.'
 }
 
+$toUpload = @($secrets | Where-Object { $values.ContainsKey($_.Name) })
 $uploaded = 0
-foreach ($secret in $secrets) {
+foreach ($secret in $toUpload) {
   if ($PSCmdlet.ShouldProcess("$($secret.Name) (env: $Environment)", 'wrangler secret put')) {
     Set-CloudflareSecret -Name $secret.Name -Value $values[$secret.Name]
     Write-Host "Uploaded $($secret.Name)"
@@ -207,7 +214,7 @@ foreach ($secret in $secrets) {
   }
 }
 
-if ($uploaded -eq $secrets.Count) {
+if ($uploaded -eq $toUpload.Count) {
   Write-Host ''
   Write-Host "All $uploaded secrets are set for the '$Environment' environment."
 

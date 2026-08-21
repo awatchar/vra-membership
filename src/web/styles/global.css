@@ -69,3 +69,16 @@ h1 {
 .vra-muted {
   color: var(--vra-text-muted);
 }
+
+.vra-privacy {
+  margin: 0 auto;
+}
+
+.vra-privacy h2 {
+  font-size: 1.125rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.vra-privacy li + li {
+  margin-top: 0.5rem;
+}

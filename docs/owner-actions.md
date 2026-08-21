@@ -40,6 +40,8 @@ pwsh -File ./scripts/set-production-secrets.ps1
 | `CF_ACCESS_TEAM_DOMAIN`                                      | Cloudflare Zero Trust → Settings → team domain                                   |
 | `CF_ACCESS_AUD`                                              | Access application → Overview → Application Audience (AUD) tag                   |
 
+สคริปต์ตรวจและอัปโหลดค่าบังคับทั้งหมดในตารางนี้แล้ว รวมทั้ง `SLIPOK_BRANCH_ID`, Turnstile site key และ Cloudflare Access values; `EMAIL_FROM_TRACKED` เป็น optional และจะอัปโหลดเมื่อมีค่า
+
 > **`PII_ENCRYPTION_KEY` เปลี่ยนไม่ได้หลังมีข้อมูลจริง** ciphertext ของเลขบัตรและ hash ที่ใช้ค้นหาซ้ำ derive จาก key นี้ทั้งคู่ และไม่มีสำเนา plaintext เก็บไว้ที่ไหนเลย **สำรอง key ไว้ที่ปลอดภัยและออฟไลน์ก่อนลบไฟล์ค่า** ถ้า key หาย เลขบัตรทุกใบอ่านไม่ได้อีกเลย
 >
 > สคริปต์จะปฏิเสธการลบไฟล์ค่าเมื่อมันเป็นคนสร้าง key ให้ แม้สั่ง `-RemoveFileWhenDone` เพราะคุณยังไม่ได้สำรอง

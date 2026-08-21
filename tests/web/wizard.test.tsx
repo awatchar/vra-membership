@@ -117,6 +117,10 @@ describe('the privacy notice', () => {
 
     expect(screen.getByText(/ระบบไม่เก็บภาพบัตร/)).toBeInTheDocument();
     expect(screen.getByText(/ระบบจะไม่ใช้ภาพจากบัตรโดยที่ท่านไม่ได้เลือก/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'ประกาศความเป็นส่วนตัวฉบับเต็ม' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    );
   });
 
   it('enables the button once accepted', async () => {

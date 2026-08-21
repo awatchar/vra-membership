@@ -53,6 +53,11 @@
   "env": {
     "production": {
       "name": "vra-membership",
+      "triggers": {
+        // Daily at 02:17 Asia/Bangkok (19:17 UTC). The non-round minute avoids
+        // the busiest edge of the hour while keeping the cleanup predictable.
+        "crons": ["17 19 * * *"]
+      },
       "routes": [
         {
           "pattern": "member.vra.or.th",
