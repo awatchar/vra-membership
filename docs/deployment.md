@@ -27,7 +27,7 @@ Pipeline ประกอบด้วยสาม workflow
    npx wrangler r2 bucket domain list vra-member-private
    ```
 
-3. ผูก custom domain `member.vra.or.th` เข้ากับ Worker `vra-membership`
+3. ~~ผูก custom domain `member.vra.or.th` เข้ากับ Worker `vra-membership`~~ **เสร็จแล้ว** custom domain ถูกผูกกับ production Worker และตอบผ่าน TLS แล้ว
 
 4. ตั้ง Cloudflare Secrets สำหรับ production
 
@@ -87,10 +87,10 @@ Pipeline ประกอบด้วยสาม workflow
 
 7. สร้าง GitHub environment ชื่อ `production` (Settings -> Environments) โดยเปิด required reviewers และจำกัด deployment branch เป็น `main` แล้วเพิ่ม environment secrets
 
-   | Secret                  | หมายเหตุ                                                                              |
-   | ----------------------- | ------------------------------------------------------------------------------------- |
-   | `CLOUDFLARE_API_TOKEN`  | least privilege: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้ |
-   | `CLOUDFLARE_ACCOUNT_ID` | account id ที่ใช้ deploy                                                              |
+   | Secret                  | หมายเหตุ                                                                                                                                                                                    |
+   | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `CLOUDFLARE_API_TOKEN`  | least privilege: Account — Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้; Zone — Workers Routes Edit เฉพาะ `vra.or.th` เพื่อสร้าง route ของ custom domain ตอน deploy |
+   | `CLOUDFLARE_ACCOUNT_ID` | account id ที่ใช้ deploy                                                                                                                                                                    |
 
 8. เปิด delivery ด้วย repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`
 
@@ -109,6 +109,21 @@ Pipeline ประกอบด้วยสาม workflow
 7. บันทึก commit SHA และ URL ไว้ใน job summary
 
 8. Wrangler ติดตั้ง production Cron `17 19 * * *` UTC สำหรับ retention ตาม `docs/retention-policy.md`
+
+## First production deployment
+
+การ deploy production ครั้งแรกจาก repository สำเร็จเมื่อ `2026-08-21T07:53:34Z` โดยมีหลักฐานที่ไม่เปิดเผย secret หรือ PII ดังนี้
+
+- Git commit: `e7519992c20eac3da140d167947c5e3bc6cf37fb`
+- GitHub Actions: [Deploy run 32460009470](https://github.com/awatchar/vra-membership/actions/runs/32460009470) — `success`
+- Cloudflare deployment: `ce95ab69-1b5c-4bcd-8b43-1f8075a7ca95`
+- Active Worker version: `39d25fd3-8e22-4df6-9445-fe696c07bef8` ที่ 100%
+- D1 migrations: `0001_create_core_schema.sql` ถึง `0006_add_five_year_membership_term.sql`
+- Custom domain: `https://member.vra.or.th`
+- Retention Cron: `17 19 * * *` UTC
+- Smoke test: `GET /api/health` ได้ HTTP 200 และรายงาน `production` / `live`
+
+การทดสอบ provider จริงและ Scenario A/B ยังต้องใช้บัตรประชาชน สลิป และการยืนยันผลโดยเจ้าของข้อมูลตาม [production go-live checklist](go-live-checklist.md) ห้ามใช้ข้อมูลจริงใน automated test หรือแนบหลักฐานที่มี PII ลง GitHub
 
 ## Rollback
 

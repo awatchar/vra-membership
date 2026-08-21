@@ -53,7 +53,7 @@ pwsh -File ./scripts/set-production-secrets.ps1
 - [x] **Turnstile site** — สร้าง widget แล้วใส่ **ทั้งสองค่า** ในข้อ 1: `TURNSTILE_SECRET_KEY` และ `TURNSTILE_SITE_KEY`
       site key เป็นค่าสาธารณะ แต่เก็บเป็น secret เหมือนกันเพราะ Worker ส่งให้ browser ผ่าน `GET /api/config` ตอน runtime — ทำให้เปลี่ยน widget ได้โดยไม่ต้อง rebuild และ CI ไม่ต้องรู้ค่านี้เลย
       **ถ้าไม่ตั้ง `TURNSTILE_SITE_KEY`** browser จะไม่แสดง widget และไม่ส่ง token ซึ่งปลอดภัยเพราะฝั่ง server เป็นคนตัดสิน: `PROVIDER_MODE=live` ต้องมี secret และปฏิเสธคำขอที่ไม่มี token
-- [ ] **Custom domain** — ผูก `member.vra.or.th` เข้ากับ Worker `vra-membership` (`wrangler.jsonc` ประกาศ route ไว้แล้ว จะถูกสร้างตอน deploy ครั้งแรก แต่ DNS ต้องพร้อม)
+- [x] **Custom domain** — `member.vra.or.th` ผูกกับ production Worker `vra-membership` แล้วและตอบผ่าน TLS
 - [x] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) แล้วคัดลอก **AUD tag** จากหน้า Overview ของ application ไปใส่ `CF_ACCESS_AUD` และ team domain ไปใส่ `CF_ACCESS_TEAM_DOMAIN` ในข้อ 1
       Worker ตรวจ JWT เองอีกชั้นด้วย ดังนั้น **ถ้าสอง secret นี้ยังไม่ได้ตั้ง ทุก admin endpoint จะปฏิเสธทุกคำขอ** ซึ่งเป็นพฤติกรรมที่ต้องการ — ไม่มีสถานะ "ยังไม่ตั้งค่าแล้วเข้าได้เลย"
 - [x] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
@@ -61,14 +61,14 @@ pwsh -File ./scripts/set-production-secrets.ps1
       ระบบตอบ 2xx ให้ event ที่ไม่ได้เลือกด้วย จึงเลือกเพิ่มได้โดยไม่พัง แต่ **การเปลี่ยนสถานะใบสมัครอาศัย `email.opened`** ถ้าไม่เลือก ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" เอง
 - [ ] **Resend — open tracking แยก sender (ไม่บังคับ)** — Resend เปิด open tracking ที่ระดับ domain ไม่มี field ต่อ message ถ้าเปิดบน domain ที่ส่งอีเมลสมาชิก อีเมลสมาชิกจะถูก track ด้วย ซึ่งขัดกับข้อกำหนดที่ให้ track เฉพาะอีเมลผู้จัดการ วิธีที่ตรงตามข้อกำหนดคือ verify subdomain แยก (เช่น `notify.vra.or.th`) เปิด open tracking บน subdomain นั้น แล้วใส่เป็น `EMAIL_FROM_TRACKED`
       **ถ้าไม่ทำ** ระบบยังทำงานครบ เพียงแต่การที่ผู้จัดการเปิดอีเมลจะไม่ขยับสถานะใบสมัครเอง ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" ซึ่งมีอยู่ในอีเมลและในระบบผู้จัดการแล้ว
-- [x] **API token สำหรับ CI** — สร้างแบบ least privilege: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้ ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning
+- [x] **API token สำหรับ CI** — สร้างแบบ least privilege: Account — Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้; Zone — Workers Routes Edit เฉพาะ `vra.or.th` ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning
 
 ---
 
 ## 3. GitHub
 
 - [x] เพิ่ม environment secrets บน environment `production`: `CLOUDFLARE_API_TOKEN` และ `CLOUDFLARE_ACCOUNT_ID`
-- [ ] ตั้ง repository variable `CLOUDFLARE_DEPLOY_ENABLED=true` เมื่อข้อ 1 และ 2 เสร็จ ก่อนหน้านั้น job `deploy` จะข้ามขั้นตอน deploy และเขียนสรุปว่ายังไม่เปิด delivery
+- [x] ตั้ง repository variable `CLOUDFLARE_DEPLOY_ENABLED=true` แล้ว และยืนยันด้วย production deploy จาก `main` ที่สำเร็จ
 - [ ] **GitHub Support request** เพื่อ purge PII ที่ยังเข้าถึงได้ผ่าน commit SHA เดิม — รายละเอียดใน [#21](https://github.com/awatchar/vra-membership/issues/21)
 
 ---
@@ -76,7 +76,7 @@ pwsh -File ./scripts/set-production-secrets.ps1
 ## 4. การตัดสินใจที่ต้องทำก่อนมีข้อมูลจริง
 
 - [ ] **Data residency** — D1 และ R2 ถูกสร้างที่ **APAC** ซึ่ง Cloudflare เลือกให้ ไม่ได้ pin ไว้ ถ้ามีข้อกำหนดเรื่องที่ตั้งข้อมูล ต้องตัดสินใจตอนนี้ เพราะย้าย location ทีหลังไม่ได้
-- [ ] **Environment protection rules** — ตอนนี้ environment `production` มี required reviewer และจำกัด branch เป็น `main` แล้ว (ใช้ได้หลัง repo เป็น public) ถ้าจะกลับเป็น private ต้องอัปเกรดแผนหรือยอมเสีย protection rules ไป
+- [x] **Environment protection rules** — environment `production` มี required reviewer และจำกัด branch เป็น `main` แล้ว (ใช้ได้หลัง repo เป็น public) ถ้าจะกลับเป็น private ต้องอัปเกรดแผนหรือยอมเสีย protection rules ไป
 - [ ] **Retention policy** — ต้องกำหนดว่าเก็บข้อมูลใบสมัคร รูปสมาชิก และ audit events นานเท่าไร และลบอย่างไร เป็นส่วนหนึ่งของ [#19](https://github.com/awatchar/vra-membership/issues/19)
 - [ ] **แจ้งผู้จัดการสมาคม** ว่าชื่อและ email ของท่านเคยปรากฏใน public repository ช่วงเวลาหนึ่ง (ดู [#21](https://github.com/awatchar/vra-membership/issues/21))
 
@@ -103,6 +103,8 @@ pwsh -File ./scripts/set-production-secrets.ps1
 - [x] สร้าง R2 `vra-member-private-dev` และ `vra-member-private` และยืนยันว่า public access ปิดและไม่มี custom domain
 - [x] Apply migration เข้า D1 ของ dev เพื่อทดสอบ SQL กับ D1 จริง
 - [x] สร้าง GitHub environment `production` พร้อม required reviewer และ branch policy `main`
+- [x] Rotate `PII_ENCRYPTION_KEY` ก่อนเปิด production และเก็บสำรองไว้นอก Git โดยไม่บันทึกค่าใน Issue, PR หรือ log
+- [x] Deploy production ครั้งแรกจาก `main` สำเร็จ พร้อม D1 migrations, custom domain, smoke test และ retention Cron ([run 32460009470](https://github.com/awatchar/vra-membership/actions/runs/32460009470))
 - [x] เปิด branch ruleset บน `main`: ห้ามลบ ห้าม force push ต้องผ่าน PR squash-only และต้องผ่าน CI ทั้งสอง check
 - [x] เปิด secret scanning, push protection, Dependabot security updates และ private vulnerability reporting
 - [x] ล้าง `manager-email.md` ออกจากประวัติ Git ของ `main` (ยังเหลือ GitHub Support request ในข้อ 3)
