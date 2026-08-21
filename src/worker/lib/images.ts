@@ -231,6 +231,18 @@ export interface VerifiedMemberPhoto {
   metadataStripped: boolean;
 }
 
+export interface VerifyMemberPhotoOptions {
+  /**
+   * Enforce the association's print-quality recommendation.
+   *
+   * Applicant uploads should satisfy it. The iApp `face` candidate is already
+   * cropped and sized by the provider, however, and upscaling those bytes would
+   * not add detail. That path may therefore disable only this recommendation;
+   * every decoding, encoding, maximum-size and metadata control still applies.
+   */
+  requirePrintMinimum?: boolean;
+}
+
 /**
  * Verifies the dimensions and encoding of a member photo and removes metadata.
  *
@@ -240,15 +252,18 @@ export interface VerifiedMemberPhoto {
 export function verifyMemberPhoto(
   bytes: Uint8Array,
   contentType: SupportedImageType,
+  options: VerifyMemberPhotoOptions = {},
 ): VerifiedMemberPhoto {
   const dimensions = readImageDimensions(bytes, contentType);
   if (!dimensions) {
     throw new ApiError('UNSUPPORTED_MEDIA_TYPE', MESSAGES.undecodable);
   }
 
+  const requirePrintMinimum = options.requirePrintMinimum ?? true;
   if (
-    dimensions.width < MEMBER_PHOTO_LIMITS.minWidth ||
-    dimensions.height < MEMBER_PHOTO_LIMITS.minHeight
+    requirePrintMinimum &&
+    (dimensions.width < MEMBER_PHOTO_LIMITS.minWidth ||
+      dimensions.height < MEMBER_PHOTO_LIMITS.minHeight)
   ) {
     throw new ApiError('VALIDATION_FAILED', MESSAGES.tooSmall);
   }

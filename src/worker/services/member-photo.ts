@@ -98,7 +98,13 @@ export function createMemberPhotoService(
         throw new ApiError('CONFLICT', MESSAGES.notEditable);
       }
 
-      const verified = verifyMemberPhoto(input.bytes, input.contentType);
+      const verified = verifyMemberPhoto(input.bytes, input.contentType, {
+        // iApp owns the dimensions of its cropped `face` candidate. Upscaling
+        // it would only manufacture pixels without improving print quality and
+        // previously trapped applicants after they had selected the preview.
+        // An applicant upload still has to meet the 300 x 400 recommendation.
+        requirePrintMinimum: input.source === 'UPLOAD',
+      });
       const key = newKey();
       const uploadedAt = now().toISOString();
 

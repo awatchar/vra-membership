@@ -51,6 +51,39 @@ describe('storing a member photo', () => {
     await expect(objectKeys()).resolves.toEqual([stored.key]);
   });
 
+  it('stores the provider-supplied ID-card face below the upload minimum', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+
+    const stored = await service(repo).store({
+      applicationId: id,
+      source: 'ID_CARD',
+      confirmed: true,
+      bytes: makeMemberPhoto({ width: 150, height: 200 }),
+      contentType: 'image/jpeg',
+    });
+
+    expect(stored).toMatchObject({ source: 'ID_CARD', width: 150, height: 200 });
+    await expect(objectKeys()).resolves.toEqual([stored.key]);
+  });
+
+  it('still refuses the same low-resolution bytes as an applicant upload', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+
+    await expect(
+      service(repo).store({
+        applicationId: id,
+        source: 'UPLOAD',
+        confirmed: true,
+        bytes: makeMemberPhoto({ width: 150, height: 200 }),
+        contentType: 'image/jpeg',
+      }),
+    ).rejects.toThrow(/ความละเอียดต่ำ/);
+
+    await expect(objectKeys()).resolves.toEqual([]);
+  });
+
   it('uses a random key that reveals nothing about the applicant', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
@@ -401,6 +434,29 @@ describe('POST /api/member-photo', () => {
 
     expect(response.status).toBe(200);
     await expect(objectKeys()).resolves.toHaveLength(1);
+  });
+
+  it('stores a low-resolution iApp face but rejects identical upload bytes', async () => {
+    const repo = repository();
+    const idFaceApplication = await seedApplication(repo, TEST_CITIZEN_ID);
+    const uploadApplication = await seedApplication(repo, OTHER_TEST_CITIZEN_ID);
+    const bytes = makeMemberPhoto({ width: 150, height: 200 });
+
+    const idFaceResponse = await exports.default.fetch(
+      photoRequest(photoForm(idFaceApplication, { source: 'ID_CARD', bytes })),
+    );
+    const uploadResponse = await exports.default.fetch(
+      photoRequest(photoForm(uploadApplication, { source: 'UPLOAD', bytes })),
+    );
+
+    expect(idFaceResponse.status).toBe(200);
+    await expect(idFaceResponse.json()).resolves.toMatchObject({
+      stored: true,
+      source: 'ID_CARD',
+      width: 150,
+      height: 200,
+    });
+    expect(uploadResponse.status).toBe(422);
   });
 
   it('refuses a request with no file', async () => {
