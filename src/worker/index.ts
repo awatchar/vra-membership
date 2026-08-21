@@ -7,6 +7,7 @@ import { ApiError, errorBody, statusForErrorCode } from './lib/http';
 import { createLogger } from './lib/logger';
 import { createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
+import { withSecurityHeaders } from './security/headers';
 import { PaymentRejectedError } from './services/payment';
 import { healthRoutes } from './routes/health';
 import { adminRoutes } from './routes/admin';
@@ -30,6 +31,21 @@ function resolveRequestId(header: string | undefined): string {
 }
 
 const app = new Hono<AppContext>();
+
+/**
+ * Security headers on every response.
+ *
+ * Outermost, so it covers an error response, an asset and an API answer alike -
+ * a policy that only applies to the paths someone remembered is not a policy.
+ * The Worker runs before the asset binding for every request (`run_worker_first`
+ * in `wrangler.jsonc`) precisely so this can wrap the HTML and the bundle too;
+ * without that, the document that loads the scripts would be the one response
+ * with no Content-Security-Policy on it.
+ */
+app.use('*', async (c, next) => {
+  await next();
+  c.res = withSecurityHeaders(c.res, c.req.raw);
+});
 
 /**
  * Per-request setup: correlation id, validated config, allowlisted logger and
@@ -72,12 +88,28 @@ app.route('/api', paymentRoutes);
 app.route('/api', webhookRoutes);
 app.route('/api', adminRoutes);
 
-/** API 404s must be JSON so the SPA fallback never masks a routing mistake. */
-app.notFound((c) => {
-  if (new URL(c.req.url).pathname.startsWith('/api/')) {
+/**
+ * Everything that is not an API route is the client application.
+ *
+ * The asset binding does the serving, including the single-page fallback, so a
+ * deep link like `/admin/applications/<id>` - which is what the manager's email
+ * contains - returns the document rather than a 404.
+ */
+app.all('*', async (c) => {
+  const path = new URL(c.req.url).pathname;
+
+  // An unknown API path must not fall through to the SPA: an HTML body with a
+  // 200 in place of a JSON 404 turns a routing mistake into a silent one.
+  if (path.startsWith('/api/')) {
     return c.json(errorBody('NOT_FOUND', 'ไม่พบปลายทางที่ร้องขอ', c.var.requestId), 404);
   }
-  return c.text('Not Found', 404);
+
+  return c.env.ASSETS.fetch(c.req.raw);
+});
+
+/** Reached only if the catch-all above is ever removed. */
+app.notFound((c) => {
+  return c.json(errorBody('NOT_FOUND', 'ไม่พบปลายทางที่ร้องขอ', c.var.requestId), 404);
 });
 
 app.onError((error, c) => {
