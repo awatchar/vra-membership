@@ -15,6 +15,7 @@ import {
   ACCESS_TOKEN_HEADER,
   createApplicationAccess,
 } from '../services/application-access';
+import { buildApplicationWorkflow } from '../services/workflow-factory';
 
 /**
  * Applicant-facing application endpoints (Issue #1 section 51).
@@ -175,6 +176,70 @@ export const applicationRoutes = new Hono<AppContext>()
 
     c.header('Cache-Control', 'no-store');
     return c.json({ application });
+  })
+
+  /**
+   * What the confirmation page reads (Issue #1 section 66): the application
+   * number and which of the post-payment steps have happened.
+   *
+   * Read-only on purpose. Resuming the workflow from a `GET` would mean a page
+   * refresh, a prefetch or a link preview could send email, so finishing a
+   * stalled application is a `POST`.
+   */
+  .get('/applications/:id/confirmation', async (c) => {
+    const applicationId = idSchema.parse(c.req.param('id'));
+
+    const { access } = await buildServices(c.env, c.var.db);
+    await access.authorize(c.req.raw, applicationId);
+
+    const workflow = await buildApplicationWorkflow(
+      c.env,
+      c.var.db,
+      c.var.providers.email,
+      c.var.config.APP_BASE_URL,
+    );
+
+    c.header('Cache-Control', 'no-store');
+    return c.json({ confirmation: await workflow.inspect(applicationId) });
+  })
+
+  /**
+   * Finishes an application whose post-payment steps did not all complete,
+   * typically because the email provider was unavailable.
+   *
+   * Every step is idempotent, so this is safe to call repeatedly: it does the
+   * work that is missing and nothing else. Rate limited because each call can
+   * reach the email provider, and authenticated by the applicant's capability
+   * token - the same token that verified the payment. The manager gets an
+   * equivalent action without the applicant's token in #16.
+   */
+  .post('/applications/:id/finalize', async (c) => {
+    const applicationId = idSchema.parse(c.req.param('id'));
+
+    const { access } = await buildServices(c.env, c.var.db);
+    await access.authorize(c.req.raw, applicationId);
+    await assertWithinRateLimit(
+      c.var.security.rateLimiter,
+      APPLICATION_POLICY,
+      clientIdentifier(c.req.raw),
+    );
+
+    const workflow = await buildApplicationWorkflow(
+      c.env,
+      c.var.db,
+      c.var.providers.email,
+      c.var.config.APP_BASE_URL,
+    );
+    const report = await workflow.resume(applicationId);
+
+    c.var.logger.info({
+      event: 'workflow.finalized',
+      applicationId,
+      reason: report.complete ? 'COMPLETE' : 'INCOMPLETE',
+    });
+
+    c.header('Cache-Control', 'no-store');
+    return c.json({ confirmation: report });
   });
 
 export { ACCESS_TOKEN_HEADER };

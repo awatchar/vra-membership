@@ -181,6 +181,45 @@ describe('uniqueness guarantees', () => {
     ).rejects.toThrow(/receipt_no/);
   });
 
+  it('rejects a second email of the same type for one application', async () => {
+    const repo = repository();
+    const applicationId = await seedApplication(repo);
+    await repo.emails.create({
+      applicationId,
+      type: 'RECEIPT',
+      recipient: 'applicant@example.test',
+      provider: 'resend',
+    });
+
+    // Two callers can both read "no receipt email yet" before either writes
+    // one. A retry reuses the existing row, so a second row of the same type is
+    // always that race rather than a legitimate second message.
+    await expect(
+      repo.emails.create({
+        applicationId,
+        type: 'RECEIPT',
+        recipient: 'applicant@example.test',
+        provider: 'resend',
+      }),
+    ).rejects.toThrow(/application_id/);
+  });
+
+  it('allows different email types for one application', async () => {
+    const repo = repository();
+    const applicationId = await seedApplication(repo);
+
+    for (const type of ['RECEIPT', 'MANAGER_NEW_APPLICATION', 'MEMBER_PROCESSING'] as const) {
+      await expect(
+        repo.emails.create({
+          applicationId,
+          type,
+          recipient: 'someone@example.test',
+          provider: 'resend',
+        }),
+      ).resolves.toMatchObject({ type });
+    }
+  });
+
   it('allows the same person to have more than one application', async () => {
     const repo = repository();
     await seedApplication(repo, TEST_CITIZEN_ID);

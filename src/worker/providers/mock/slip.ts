@@ -22,6 +22,8 @@ export interface MockSlipOptions {
   failWith?: Extract<SlipVerificationResult, { ok: false }>['reason'];
   /** When true the returned amount mirrors `expectedAmount`. */
   matchExpectedAmount?: boolean;
+  /** Clock for the default transfer time. Injected by tests that pin dates. */
+  now?: () => Date;
 }
 
 export function createMockSlipProvider(options: MockSlipOptions = {}): SlipVerificationProvider {
@@ -34,9 +36,21 @@ export function createMockSlipProvider(options: MockSlipOptions = {}): SlipVerif
       const amount =
         options.transaction?.amount ??
         (options.matchExpectedAmount === false ? MOCK_TRANSACTION.amount : request.expectedAmount);
+
+      // The transfer time defaults to now rather than to the fixed value in
+      // `MOCK_TRANSACTION`, because verification refuses a slip older than
+      // seven days: a constant would make every mock payment fail as stale, in
+      // local development as well as in tests. Callers that pin a clock pass
+      // `transaction.transactionAt` or `now` and get exactly what they asked
+      // for.
+      const transactionAt =
+        options.transaction?.transactionAt !== undefined
+          ? options.transaction.transactionAt
+          : (options.now ?? (() => new Date()))().toISOString();
+
       return {
         ok: true,
-        transaction: { ...MOCK_TRANSACTION, ...options.transaction, amount },
+        transaction: { ...MOCK_TRANSACTION, ...options.transaction, amount, transactionAt },
       };
     },
   };

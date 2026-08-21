@@ -16,6 +16,7 @@ import { formatBaht, membershipPlan } from '../services/membership';
 import { createPaymentService } from '../services/payment';
 import type { AssociationAccount } from '../services/payment';
 import { createStateMachine } from '../services/state-machine';
+import { buildApplicationWorkflow } from '../services/workflow-factory';
 
 /**
  * Payment endpoints.
@@ -177,11 +178,33 @@ export const paymentRoutes = new Hono<AppContext>()
       source: evidence.kind === 'qr' ? 'QR' : 'IMAGE',
     });
 
+    // Everything after the money is confirmed happens here rather than on a
+    // second request from the applicant (Issue #1 section 28). It runs after
+    // verification has been committed, so a provider failure inside it leaves
+    // the payment and the receipt intact and reports which step stalled.
+    const workflow = await buildApplicationWorkflow(
+      c.env,
+      c.var.db,
+      c.var.providers.email,
+      c.var.config.APP_BASE_URL,
+    );
+    const report = await workflow.resume(applicationId);
+
+    c.var.logger.info({
+      event: 'workflow.resumed',
+      applicationId,
+      reason: report.complete ? 'COMPLETE' : 'INCOMPLETE',
+    });
+
     c.header('Cache-Control', 'no-store');
     return c.json({
       verified: true,
       amountSatang: verified.amountSatang,
       amountBaht: formatBaht(verified.amountSatang),
-      status: 'PAYMENT_VERIFIED',
+      status: report.status,
+      referenceNo: report.referenceNo,
+      receiptNo: report.receiptNo,
+      steps: report.steps,
+      complete: report.complete,
     });
   });

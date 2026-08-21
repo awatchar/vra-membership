@@ -47,6 +47,8 @@ src/worker/            Cloudflare Worker (Hono)
     receipt.ts         receipt issuing and regeneration
     email.ts           transactional email, recorded per message
     email-events.ts    delivery events, and the one status change they cause
+    application-workflow.ts  what happens after a payment is verified
+    workflow-factory.ts      assembly shared by the routes that run it
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
@@ -270,6 +272,33 @@ Resend ส่งแบบ at-least-once และเอกสารของเ�
 guard นั้นคือ compare-and-set ของ state machine — **เฉพาะผู้เรียกที่ transition ได้ `APPLIED` เท่านั้นที่ส่งอีเมล** `email.opened` สิบครั้งกับการกดปุ่มแทรกกลางจึงได้อีเมลหนึ่งฉบับ ทางเลือกอื่นคืออ่านสถานะแล้วตัดสิน ซึ่งมีช่องว่างระหว่างการอ่านกับการเขียนที่ทำให้ผู้เรียกทั้งสองเห็นค่าเดียวกัน (test ยืนยันด้วยการยิงพร้อมกัน และการเปลี่ยน guard ให้หลวมทำให้ test fail ด้วยอีเมลสองฉบับ)
 
 อีเมลที่ส่งไม่สำเร็จไม่ย้อนสถานะกลับ ผู้จัดการเริ่มงานไปแล้วจริง การ rollback เพื่อรายงานข้อเท็จจริงหนึ่งจะทำให้เสียข้อเท็จจริงอีกอันไป — แถวอีเมลยังอยู่ให้ retry ได้
+
+## Post-payment workflow
+
+หลังเงินยืนยันแล้ว ผู้สมัครไม่ต้องกด submit อีก (หัวข้อ 28) ระบบเดินต่อเองตามลำดับ:
+
+```text
+PAYMENT_VERIFIED → ออกเลขที่ใบสมัคร → RECEIPT_ISSUED
+  → RECEIPT_EMAIL_SENT → APPLICATION_SUBMITTED → MANAGER_EMAIL_SENT
+```
+
+เลขที่ใบสมัครมาก่อนใบเสร็จ เพราะทั้งใบเสร็จและอีเมลทั้งสองฉบับพิมพ์เลขนี้ ถ้าออกใบเสร็จก่อน เอกสารที่สมาชิกเก็บไว้จะขึ้นว่า "ยังไม่ออกเลขที่ใบสมัคร"
+
+**ไม่มีคอลัมน์ `current_step`** แต่ละขั้นตัดสินว่าตัวเองเสร็จแล้วหรือยัง จากสิ่งที่มันควรจะสร้างไว้ — เลขที่บนแถว, ใบเสร็จของใบสมัครนี้, อีเมลชนิดนั้นที่ provider รับแล้ว, หรือสถานะเอง คอลัมน์บอกความคืบหน้าคือแหล่งความจริงที่สองซึ่งขัดกับแหล่งแรกได้ และแหล่งแรกคือแหล่งที่นับ
+
+**ขั้นที่ล้มเหลวไม่ล้มขั้นก่อนหน้า** ตอนนี้สมาคมมีเงินแล้ว ถ้า Resend ล่ม ใบเสร็จยังออก ใบสมัครยังถูก submit และแถวอีเมลถือความล้มเหลวของตัวเองไว้ให้ retry `resume` เริ่มต่อจากจุดที่ครั้งก่อนหยุดพอดี — provider ล่มจึงมีราคาเท่ากับการ retry ไม่ใช่การเสียการชำระเงิน
+
+`MANAGER_NOTIFIED` ถูกบันทึกเฉพาะเมื่อ **อีเมลผู้จัดการถูกรับจริง** เพราะสถานะนี้บอกว่า "แจ้งผู้จัดการแล้ว" และ #14 ใช้สถานะนี้เป็นฐานของการนับ open ถ้าบันทึกหลังส่งไม่สำเร็จ ใบสมัครที่ยังไม่มีใครเห็นจะดูเหมือนถูกจัดการแล้ว
+
+### จุดที่ยิงพร้อมกันได้
+
+`resume` สองครั้งพร้อมกันจะอ่านว่า "ยังไม่มีอีเมลชนิดนี้" ทั้งคู่ ฝ่ายที่แพ้ `UNIQUE(application_id, type)` (migration 0004) จะ **ส่งไปที่แถวที่ชนะ** ไม่ใช่สร้างแถวใหม่ ทั้งคู่จึงใช้ idempotency key เดียวกันและ Resend คืน message เดิม ผู้รับได้อีเมลฉบับเดียว (test พิสูจน์ด้วยการเอา migration ออกแล้ว test fail ด้วยสองแถว)
+
+### Endpoint
+
+- `POST /api/payment/verify` รัน workflow ต่อทันทีหลัง commit การยืนยัน แล้วคืนสถานะแต่ละขั้นมาด้วย
+- `GET /api/applications/:id/confirmation` อ่านสถานะแต่ละขั้น (หัวข้อ 66) **อ่านอย่างเดียว** — การ resume จาก GET จะทำให้การ refresh หน้า, prefetch หรือ link preview ส่งอีเมลได้
+- `POST /api/applications/:id/finalize` เดินขั้นที่ค้างให้จบ ใช้ capability token เดิมกับที่ยืนยันการชำระเงิน และมี rate limit เพราะเรียก provider ได้ ฝั่งผู้จัดการจะได้ action เทียบเท่าที่ไม่ต้องใช้ token ของผู้สมัครใน #16
 
 ## Decision records
 
