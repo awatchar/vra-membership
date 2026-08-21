@@ -752,6 +752,10 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async markDelivered(id, deliveredAt) {
+      // Resend delivers webhooks at least once and warns that they may arrive
+      // out of order, so the status is only ever advanced. Without the guard a
+      // late `email.delivered` would overwrite a `BOUNCED` row and report a
+      // message as delivered that the recipient's server refused.
       const timestamp = isoNow(now);
       await run(
         db
@@ -760,7 +764,7 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
                status = 'DELIVERED',
                delivered_at = coalesce(delivered_at, ?),
                updated_at = ?
-             where id = ?`,
+             where id = ? and status in ('QUEUED', 'SENT', 'DELIVERED')`,
           )
           .bind(deliveredAt ?? timestamp, timestamp, id),
       );

@@ -27,6 +27,14 @@ export default defineConfig(async () => {
             // Test-only key material. Endpoints that protect the citizen ID or
             // issue a capability token derive both from this secret.
             PII_ENCRYPTION_KEY: 'test-only-pii-encryption-key-material-0123456789',
+            // Test-only Svix signing secret, so webhook tests verify real
+            // signatures rather than a mock that answers "valid". The value is
+            // valid base64 and says `testonly` in plain sight, which is what
+            // exempts it from the hard-coded-secret check in
+            // `scripts/validate-repository.ps1`.
+            RESEND_WEBHOOK_SECRET: 'whsec_testonlywebhooksecret123',
+            MANAGER_EMAIL: 'manager@example.test',
+            EMAIL_FROM: 'VRA <membership@example.test>',
             TEST_MIGRATIONS: migrations,
           },
         },

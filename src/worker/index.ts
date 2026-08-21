@@ -13,6 +13,7 @@ import { applicationRoutes } from './routes/applications';
 import { memberPhotoRoutes } from './routes/member-photo';
 import { OcrFailedError, ocrRoutes } from './routes/ocr';
 import { paymentRoutes } from './routes/payment';
+import { webhookRoutes } from './routes/webhooks';
 
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
 
@@ -67,6 +68,7 @@ app.route('/api', ocrRoutes);
 app.route('/api', memberPhotoRoutes);
 app.route('/api', applicationRoutes);
 app.route('/api', paymentRoutes);
+app.route('/api', webhookRoutes);
 
 /** API 404s must be JSON so the SPA fallback never masks a routing mistake. */
 app.notFound((c) => {
