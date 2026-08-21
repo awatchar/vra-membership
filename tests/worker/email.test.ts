@@ -431,6 +431,34 @@ describe('retry', () => {
     expect(await repo.emails.findByApplicationIdAndType(id, 'MEMBER_PROCESSING')).toHaveLength(1);
   });
 
+  it('keeps the time the member was first mailed', async () => {
+    const repo = repository();
+    const id = await paidApplication(repo);
+    const audit = createAuditLog(repo);
+    const receipts = createReceiptService(
+      repo,
+      createNumberingService(repo, { now: () => NOW }),
+      audit,
+      { now: () => NOW },
+    );
+    const provider = createMockEmailProvider();
+    const build = (clock: Date) =>
+      createEmailService(repo, provider, receipts, audit, {
+        managerEmail: MANAGER_EMAIL,
+        appBaseUrl: APP_BASE_URL,
+        now: () => clock,
+      });
+
+    const first = await build(NOW).sendMemberProcessing(id);
+    const emailId = (first as { emailId: string }).emailId;
+    await build(new Date('2026-08-21T03:00:00.000Z')).retry(emailId);
+
+    // The retry is deduplicated by the provider and returns the original
+    // message, so a later `sent_at` would record a send that did not happen.
+    const rows = await repo.emails.findByApplicationIdAndType(id, 'MEMBER_PROCESSING');
+    expect(rows[0]!.sentAt).toBe(NOW.toISOString());
+  });
+
   it('turns a failed row into a sent one', async () => {
     const repo = repository();
     const id = await paidApplication(repo);

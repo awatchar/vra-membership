@@ -724,11 +724,19 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
 
     async markSent(id, providerEmailId, sentAt) {
+      // `coalesce` on `sent_at` keeps when the recipient was first mailed. A
+      // retry after an unknown outcome is deduplicated by the provider and
+      // returns the original message, so overwriting the timestamp would
+      // record a send that did not happen.
       const timestamp = isoNow(now);
       await run(
         db
           .prepare(
-            `update emails set status = 'SENT', provider_email_id = ?, sent_at = ?, updated_at = ?
+            `update emails set
+               status = 'SENT',
+               provider_email_id = ?,
+               sent_at = coalesce(sent_at, ?),
+               updated_at = ?
              where id = ?`,
           )
           .bind(providerEmailId, sentAt ?? timestamp, timestamp, id),
