@@ -1,6 +1,7 @@
 export * from './application';
 export * from './application-access';
 export * from './audit';
+export * from './email';
 export * from './membership';
 export * from './payment';
 export * from './receipt';

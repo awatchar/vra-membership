@@ -19,7 +19,7 @@ Repository อยู่ในระยะ bootstrap และยังไม่�
 3. **Client: React + Vite** build ลง `dist/client` แล้วให้ Workers assets binding เสิร์ฟ ขั้นตอนสมัครสมาชิกเป็น wizard หลายขั้นที่มีการถ่ายภาพ crop รูป และ decode QR ฝั่ง browser ซึ่งต้องการ state management ที่ตรวจสอบได้ การเขียนด้วย DOM API ตรง ๆ จะกลายเป็น state machine ที่ทำเองและ test ยากกว่า
 4. **Validation: zod** ใช้ทั้งกับ configuration และ request payload เพื่อให้ validation เป็น schema เดียวที่อ่านออก
 5. **Tests: Vitest ผ่าน `@cloudflare/vitest-pool-workers`** ทุก suite รันใน workerd จริงและเข้าถึง D1/R2 binding ได้ ทำให้ test schema, storage และ routing ได้โดยไม่ต้องมี integration environment แยก และ `PROVIDER_MODE=mock` ถูกบังคับใน test config
-6. **Provider abstraction** iApp, SlipOK และ Resend อยู่หลัง interface ใน `src/worker/providers/types.ts` พร้อม mock ใน `src/worker/providers/mock/` factory จะ throw `ProviderNotConfiguredError` เมื่อขอ live adapter ที่ยังไม่มี แทนที่จะ fallback ไปใช้ mock เงียบ ๆ บน production
+6. **Provider abstraction** iApp, SlipOK และ Resend อยู่หลัง interface ใน `src/worker/providers/types.ts` พร้อม mock ใน `src/worker/providers/mock/` การขอ live adapter ที่ยังไม่มีหรือยังไม่ได้ตั้ง secret จะ fail ทันที ไม่ fallback ไปใช้ mock เงียบ ๆ บน production (ตอนแรกใช้ `ProviderNotConfiguredError`; เมื่อ live adapter ครบทั้งสามใน #13 แล้ว การขอ adapter ที่ขาด secret จะเป็น `ConfigurationError` ซึ่งระบุชื่อตัวแปรแต่ไม่เคยระบุค่า)
 7. **Logging** ผ่าน allowlist logger เท่านั้น และ ESLint บล็อก `console` ใน `src/worker/**`
 8. **Delivery** แยก quality gates เป็น reusable workflow ที่ทั้ง `ci.yml` และ `deploy.yml` เรียกใช้ job deploy มี `needs` ผูกกับ gates และผูกกับ GitHub environment `production` การเปิด delivery จริงคุมด้วย repository variable `CLOUDFLARE_DEPLOY_ENABLED`
 

@@ -122,6 +122,12 @@ export interface OutboundEmail {
   trackOpens?: boolean;
   /** Correlation tag stored by the provider, e.g. the internal application id. */
   tags?: Record<string, string>;
+  /**
+   * Deduplication key honoured by the provider. Sending the same key twice
+   * returns the first message rather than mailing the recipient again, which is
+   * what makes a retry after an unknown outcome safe.
+   */
+  idempotencyKey?: string;
 }
 
 export type EmailFailureReason = 'REJECTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';

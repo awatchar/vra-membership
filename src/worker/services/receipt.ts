@@ -1,5 +1,6 @@
 import type { ApplicationRecord, PaymentRecord, ReceiptRecord, Repository } from '../db';
 import { UniqueConstraintError } from '../db';
+import { ASSOCIATION_NAME } from '../lib/association';
 import { ApiError } from '../lib/http';
 import { renderReceiptPdf } from '../lib/pdf/receipt';
 import type { AuditLog } from './audit';
@@ -17,8 +18,6 @@ import type { NumberingService } from './numbering';
  * The PDF is generated in memory and never stored. Only the receipt data lives
  * in D1, which is what makes regeneration exact rather than approximate.
  */
-
-const ASSOCIATION_NAME = 'สมาคมนักวิทยุอาสาสมัคร';
 
 const MESSAGES = {
   applicationNotFound: 'ไม่พบใบสมัครนี้',
