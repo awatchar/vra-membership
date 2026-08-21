@@ -110,6 +110,12 @@ Pipeline ประกอบด้วยสาม workflow
 
 8. Wrangler ติดตั้ง production Cron `17 19 * * *` UTC สำหรับ retention ตาม `docs/retention-policy.md`
 
+### Worker bundle policy
+
+Wrangler minify Worker bundle และอัปโหลด source map แยกให้ Cloudflare เพื่อให้ production exception ยังวิเคราะห์ได้โดยไม่เพิ่ม source map ใน Worker module หรือเปิดเป็น public asset
+
+ใบสำคัญรับเงินใช้เฉพาะฟอนต์ Sarabun ที่อยู่ใน repository และวาดเฉพาะข้อความกับเส้น จึง alias optional dependency ของ pdf-lib สองรายการออกจาก runtime bundle ได้แก่ built-in Latin font metrics และ PNG decoder ทั้งสอง alias ชี้ไปที่ guard ที่ throw อย่างชัดเจน หากเพิ่ม built-in font หรือรูป PNG ในเอกสารภายหลัง ต้องเอา alias ที่เกี่ยวข้องออก ทบทวนขนาด bundle และรัน receipt tests ก่อน deploy
+
 ## First production deployment
 
 การ deploy production ครั้งแรกจาก repository สำเร็จเมื่อ `2026-08-21T07:53:34Z` โดยมีหลักฐานที่ไม่เปิดเผย secret หรือ PII ดังนี้

@@ -16,6 +16,20 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Minification materially reduces cold-start parsing. Upload the source map
+  // separately so production exceptions remain diagnosable without putting
+  // the map in the Worker module or exposing it as a public asset.
+  "minify": true,
+  "upload_source_maps": true,
+  // pdf-lib imports its built-in Latin font metrics and PNG decoder even
+  // though the receipt uses only vendored Sarabun TTF fonts and no images.
+  // Replace those optional paths with fail-closed guards so they do not add
+  // cold-start weight. Receipt tests prove both guards and the supported Thai
+  // path; remove an alias before adding the corresponding feature.
+  "alias": {
+    "@pdf-lib/standard-fonts": "./src/worker/lib/pdf/standard-fonts-disabled.ts",
+    "@pdf-lib/upng": "./src/worker/lib/pdf/png-disabled.ts"
+  },
   // The receipt PDF embeds a Thai font, which has to reach the Worker as bytes.
   // Without this rule the .ttf import is treated as text and the font is
   // corrupted in a way that only shows up as unreadable output.
