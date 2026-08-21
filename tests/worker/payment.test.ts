@@ -470,13 +470,55 @@ describe('a payment that is not expected', () => {
     expect(events.map((event) => event.eventType)).toContain('PAYMENT_PRESENTED_WHEN_NOT_EXPECTED');
   });
 
-  it('distinguishes not-yet-there from already-paid', async () => {
+  it('repairs a legacy draft whose server-resolved membership was already stored', async () => {
     const repo = repository();
-    // Still a draft: the applicant has not reached the payment step.
     const id = await seedApplication(repo);
     await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
 
-    const error = await service(repo)
+    await expect(service(repo).verify({ applicationId: id, evidence: QR })).resolves.toMatchObject({
+      amountSatang: FIVE_YEAR_SATANG,
+    });
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({
+      status: 'PAYMENT_VERIFIED',
+    });
+  });
+
+  it('repairs the legacy status before contacting the provider', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
+
+    const error = await service(repo, { failWith: 'PROVIDER_TIMEOUT' })
+      .verify({ applicationId: id, evidence: QR })
+      .catch((reason: unknown) => reason);
+
+    expect((error as PaymentRejectedError).reason).toBe('PROVIDER_UNAVAILABLE');
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({
+      status: 'AWAITING_PAYMENT',
+    });
+  });
+
+  it('does not repair an inconsistent draft that already has a recorded payment', async () => {
+    const repo = repository();
+    const id = await readyToPay(repo);
+    await service(repo).verify({ applicationId: id, evidence: QR });
+    await repo.applications.updateStatusIf(id, ['PAYMENT_VERIFIED'], 'DRAFT');
+
+    const error = await service(repo, {
+      transaction: { transactionRef: 'SECOND-TXN', receiverAccountDigits: '7890' },
+    })
+      .verify({ applicationId: id, evidence: QR })
+      .catch((reason: unknown) => reason);
+
+    expect((error as PaymentRejectedError).reason).toBe('ALREADY_PAID');
+    await expect(repo.payments.findByApplicationId(id)).resolves.toHaveLength(1);
+  });
+
+  it('still refuses a draft with no membership before contacting the provider', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+
+    const error = await service(repo, { failWith: 'SLIP_NOT_FOUND' })
       .verify({ applicationId: id, evidence: QR })
       .catch((reason: unknown) => reason);
 

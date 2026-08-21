@@ -15,6 +15,7 @@ import {
   ACCESS_TOKEN_HEADER,
   createApplicationAccess,
 } from '../services/application-access';
+import { createStateMachine } from '../services/state-machine';
 import { buildApplicationWorkflow } from '../services/workflow-factory';
 
 /**
@@ -111,6 +112,7 @@ async function buildServices(env: AppContext['Bindings'], db: AppContext['Variab
     await createCitizenIdProtection(keyMaterial),
     access,
     createAuditLog(db),
+    createStateMachine(db),
   );
   return { access, service };
 }

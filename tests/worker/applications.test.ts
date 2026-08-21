@@ -272,10 +272,39 @@ describe('PATCH /api/applications/:id', () => {
     );
 
     await expect(
-      response.json<{ application: { membershipAmountSatang: number } }>(),
+      response.json<{ application: { membershipAmountSatang: number; status: string } }>(),
     ).resolves.toMatchObject({
-      application: { membershipAmountSatang: membershipPlan('LIFETIME').amountSatang },
+      application: {
+        membershipAmountSatang: membershipPlan('LIFETIME').amountSatang,
+        status: 'AWAITING_PAYMENT',
+      },
     });
+  });
+
+  it('moves into payment once and keeps membership changes idempotent there', async () => {
+    const created = await createApplication();
+
+    const first = await exports.default.fetch(
+      patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
+    );
+    const second = await exports.default.fetch(
+      patchRequest(created.application.id, created.accessToken, { membershipType: 'LIFETIME' }),
+    );
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({
+      application: {
+        status: 'AWAITING_PAYMENT',
+        membershipAmountSatang: membershipPlan('LIFETIME').amountSatang,
+      },
+    });
+
+    const events = await repository().events.listByApplicationId(created.application.id);
+    const paymentTransitions = events.filter(
+      (event) => event.eventType === 'STATUS_CHANGED' && event.metadata?.to === 'AWAITING_PAYMENT',
+    );
+    expect(paymentTransitions).toHaveLength(1);
   });
 
   it('rejects a client-supplied amount instead of ignoring it', async () => {

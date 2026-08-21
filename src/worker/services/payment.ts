@@ -156,9 +156,28 @@ export function createPaymentService(
 
   return {
     async verify(input) {
-      const application = await db.applications.findById(input.applicationId);
+      let application = await db.applications.findById(input.applicationId);
       if (!application) {
         throw new ApiError('NOT_FOUND', 'ไม่พบใบสมัครนี้ กรุณาเริ่มขั้นตอนใหม่');
+      }
+
+      // Compatibility repair for applications created before Issue #55. The
+      // old membership PATCH stored the server-resolved plan but forgot the
+      // DRAFT -> AWAITING_PAYMENT transition, leaving an applicant trapped on
+      // a payment page that could never accept their slip. Repair only that
+      // exact shape, through the normal state machine, before provider work.
+      const legacyDraftHasNoPayment =
+        application.status === 'DRAFT' &&
+        application.membershipType !== null &&
+        (await db.payments.findByApplicationId(input.applicationId)).length === 0;
+      if (legacyDraftHasNoPayment) {
+        await stateMachine.transition(input.applicationId, 'AWAITING_PAYMENT', {
+          actorType: 'APPLICANT',
+        });
+        application = await db.applications.findById(input.applicationId);
+        if (!application) {
+          throw new ApiError('NOT_FOUND', 'ไม่พบใบสมัครนี้ กรุณาเริ่มขั้นตอนใหม่');
+        }
       }
 
       // Refuse before calling the provider if a payment is not expected.
