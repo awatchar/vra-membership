@@ -122,6 +122,76 @@ export interface ResendOptions {
   now?: () => Date;
 }
 
+export interface SvixSignatureInput {
+  /** The raw request body, byte for byte. */
+  payload: string;
+  headers: Headers;
+  secret: string;
+  /** Clock used for the timestamp tolerance. Injected by tests. */
+  now?: () => Date;
+}
+
+/**
+ * Verifies a Svix signature over `${svix-id}.${svix-timestamp}.${payload}`.
+ *
+ * Exported on its own because it is pure cryptography with no network call and
+ * no provider account behind it. The webhook route uses this directly rather
+ * than going through the provider container, so signature checking is the real
+ * one in every environment - a mock that answered "valid" would turn a
+ * status-changing public endpoint into an unauthenticated one.
+ *
+ * `payload` must be the raw request body. Re-serialising parsed JSON changes the
+ * whitespace and every signature stops matching.
+ *
+ * The timestamp check is what makes a captured request useless later: a valid
+ * signature stays valid forever, so without it an attacker who once saw a
+ * delivery webhook could replay it indefinitely.
+ */
+export async function verifySvixSignature(input: SvixSignatureInput): Promise<boolean> {
+  const clock = input.now ?? (() => new Date());
+
+  const id = input.headers.get('svix-id');
+  const timestamp = input.headers.get('svix-timestamp');
+  const signatureHeader = input.headers.get('svix-signature');
+  if (!id || !timestamp || !signatureHeader) return false;
+
+  const sentAt = Number(timestamp);
+  if (!Number.isFinite(sentAt)) return false;
+  if (Math.abs(clock().getTime() / 1000 - sentAt) > WEBHOOK_TOLERANCE_SECONDS) return false;
+
+  // `whsec_` is a readability prefix, not part of the key material.
+  const secret = input.secret.startsWith('whsec_')
+    ? input.secret.slice('whsec_'.length)
+    : input.secret;
+
+  let key: CryptoKey;
+  try {
+    key = await crypto.subtle.importKey(
+      'raw',
+      fromBase64(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+  } catch {
+    return false;
+  }
+
+  const signed = new TextEncoder().encode(`${id}.${timestamp}.${input.payload}`);
+  const expected = base64(new Uint8Array(await crypto.subtle.sign('HMAC', key, signed)));
+
+  // The header carries a space-delimited list so a secret can be rotated with
+  // both signatures present. Every versioned entry is checked, and the
+  // comparison is constant time even though only one can match.
+  let matched = false;
+  for (const entry of signatureHeader.split(' ')) {
+    const [version, value] = entry.split(',');
+    if (version !== 'v1' || !value) continue;
+    if (timingSafeEqual(value, expected)) matched = true;
+  }
+  return matched;
+}
+
 export function createResendProvider(options: ResendOptions): EmailProvider {
   const baseUrl = options.baseUrl ?? BASE_URL;
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -195,62 +265,8 @@ export function createResendProvider(options: ResendOptions): EmailProvider {
       return { ok: true, providerEmailId: id };
     },
 
-    /**
-     * Verifies a Svix signature over `${svix-id}.${svix-timestamp}.${payload}`.
-     *
-     * The timestamp check is what makes a captured request useless later: a
-     * valid signature stays valid forever, so without it an attacker who once
-     * saw a delivery webhook could replay it indefinitely.
-     *
-     * `payload` must be the raw request body, byte for byte. Re-serialising the
-     * parsed JSON changes the whitespace and every signature stops matching.
-     */
-    async verifyWebhookSignature(request: {
-      payload: string;
-      headers: Headers;
-      secret: string;
-    }): Promise<boolean> {
-      const id = request.headers.get('svix-id');
-      const timestamp = request.headers.get('svix-timestamp');
-      const signatureHeader = request.headers.get('svix-signature');
-      if (!id || !timestamp || !signatureHeader) return false;
-
-      const sentAt = Number(timestamp);
-      if (!Number.isFinite(sentAt)) return false;
-      const age = Math.abs(now().getTime() / 1000 - sentAt);
-      if (age > WEBHOOK_TOLERANCE_SECONDS) return false;
-
-      // `whsec_` is a readability prefix, not part of the key material.
-      const secret = request.secret.startsWith('whsec_')
-        ? request.secret.slice('whsec_'.length)
-        : request.secret;
-
-      let key: CryptoKey;
-      try {
-        key = await crypto.subtle.importKey(
-          'raw',
-          fromBase64(secret),
-          { name: 'HMAC', hash: 'SHA-256' },
-          false,
-          ['sign'],
-        );
-      } catch {
-        return false;
-      }
-
-      const signed = new TextEncoder().encode(`${id}.${timestamp}.${request.payload}`);
-      const expected = base64(new Uint8Array(await crypto.subtle.sign('HMAC', key, signed)));
-
-      // The header carries a space-delimited list so a secret can be rotated
-      // with both signatures present. Every versioned entry is checked, and the
-      // comparison is constant time even though only one can match.
-      let matched = false;
-      for (const entry of signatureHeader.split(' ')) {
-        const [version, value] = entry.split(',');
-        if (version !== 'v1' || !value) continue;
-        if (timingSafeEqual(value, expected)) matched = true;
-      }
-      return matched;
+    verifyWebhookSignature(request: { payload: string; headers: Headers; secret: string }) {
+      return verifySvixSignature({ ...request, now });
     },
   };
 }

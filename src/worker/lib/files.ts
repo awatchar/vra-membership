@@ -155,6 +155,34 @@ export function validateImageBytes(
  * The `Content-Length` header is checked first purely to fail fast; it is
  * client-supplied, so the byte count from the stream is the one that decides.
  */
+/**
+ * Reads a request body as UTF-8 text, refusing anything over `maxBytes`.
+ *
+ * Webhook signatures cover the raw bytes, so the body has to be read as text
+ * once and passed around unchanged - parsing and re-serialising it changes the
+ * whitespace and invalidates the signature. The size cap is here because the
+ * endpoint is public: a signature can only be checked after the body has been
+ * read, so the read itself has to be bounded.
+ */
+export async function readTextWithLimit(request: Request, maxBytes: number): Promise<string> {
+  const declaredLength = Number(request.headers.get('content-length') ?? '');
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', MESSAGES.tooLarge);
+  }
+
+  const body: ReadableStream<Uint8Array> | null = request.body;
+  if (!body) {
+    throw new ApiError('BAD_REQUEST', MESSAGES.empty);
+  }
+
+  const { bytes, exceeded } = await readWithLimit(body, maxBytes);
+  if (exceeded) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', MESSAGES.tooLarge);
+  }
+
+  return new TextDecoder().decode(bytes);
+}
+
 export async function readValidatedImage(
   request: Request,
   options: ImageValidationOptions,

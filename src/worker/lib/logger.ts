@@ -28,6 +28,8 @@ const ALLOWED_FIELDS = [
   'attempt',
   'count',
   'reason',
+  // Enum-valued: an internal email type or a provider event name.
+  'emailType',
 ] as const;
 
 export type LogField = (typeof ALLOWED_FIELDS)[number];

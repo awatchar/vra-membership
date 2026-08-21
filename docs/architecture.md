@@ -23,6 +23,7 @@ src/worker/            Cloudflare Worker (Hono)
   env.ts               validated non-secret configuration and secret access
   context.ts           Hono generics shared by every route
   routes/              HTTP routes
+    webhooks.ts        provider callbacks; signature is the only authentication
   db/                  data access layer; the only module that knows SQL
     types.ts           internal models and the status/type unions
     mappers.ts         row to model conversion
@@ -45,6 +46,7 @@ src/worker/            Cloudflare Worker (Hono)
     payment.ts         the five checks that accept a payment
     receipt.ts         receipt issuing and regeneration
     email.ts           transactional email, recorded per message
+    email-events.ts    delivery events, and the one status change they cause
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
@@ -249,9 +251,25 @@ HTML เขียนแบบเก่าโดยตั้งใจ — table, 
 
 Resend ไม่มี field ต่อ message สำหรับ open tracking — มันเป็นคุณสมบัติของ sending domain ดังนั้น `trackOpens` จึงเลือก **sender อีกตัว** (`EMAIL_FROM_TRACKED`) ที่ตั้ง open tracking ไว้ แทนการ set field ถ้าไม่ตั้ง sender ตัวที่สอง `trackOpens` จะไม่มีผลและ open ของผู้จัดการจะไม่ขยับสถานะใบสมัคร ซึ่งรับได้เพราะผู้จัดการมีปุ่มกดเองอยู่แล้วและไม่มีขั้นตอนใดพึ่ง tracking เพียงทางเดียว (หัวข้อ 34)
 
-### Webhook signature
+### Webhook
 
-Resend เซ็นด้วย Svix: HMAC-SHA256 บน `${svix-id}.${svix-timestamp}.${raw body}` โดย secret ตัด `whsec_` ออกแล้ว base64-decode `payload` ต้องเป็น body ดิบ byte ต่อ byte — การ serialize JSON ที่ parse แล้วใหม่จะเปลี่ยน whitespace และ signature ทุกตัวจะไม่ตรง (test ยืนยันด้วย vector ที่ Svix เผยแพร่เอง) การเทียบเป็น constant time และปฏิเสธ timestamp ที่ห่างเกิน 5 นาที เพราะ signature ที่ถูกต้องจะถูกต้องตลอดไป ถ้าไม่ตรวจเวลาก็ replay ได้ไม่จำกัด
+`POST /api/webhooks/resend` เป็น endpoint สาธารณะที่ **เปลี่ยนสถานะใบสมัครได้** signature จึงเป็นสิ่งเดียวที่กั้นระหว่างอินเทอร์เน็ตกับ state machine และถูกตรวจด้วย implementation จริงในทุก environment ไม่ผ่าน provider container — เพราะ `PROVIDER_MODE=mock` ตอบว่า "ถูกต้อง" กับทุกอย่าง การเอา mock ไปวางตำแหน่งนี้จะทำให้ endpoint ที่เปลี่ยนสถานะได้กลายเป็น endpoint ที่ไม่มี authentication
+
+Resend เซ็นด้วย Svix: HMAC-SHA256 บน `${svix-id}.${svix-timestamp}.${raw body}` โดย secret ตัด `whsec_` ออกแล้ว base64-decode `payload` ต้องเป็น body ดิบ byte ต่อ byte — การ serialize JSON ที่ parse แล้วใหม่จะเปลี่ยน whitespace และ signature ทุกตัวจะไม่ตรง (test ยืนยันด้วย vector ที่ Svix เผยแพร่เอง) การเทียบเป็น constant time และปฏิเสธ timestamp ที่ห่างเกิน 5 นาที เพราะ signature ที่ถูกต้องจะถูกต้องตลอดไป ถ้าไม่ตรวจเวลาก็ replay ได้ไม่จำกัด body ถูกอ่านโดยจำกัดขนาดที่ 64 KB เพราะ signature ตรวจได้หลังอ่าน body แล้ว การอ่านจึงต้องมีขอบเขตของตัวเอง
+
+หลัง signature ผ่าน **ทุกอย่างตอบ 2xx** Resend retry non-2xx ต่อเนื่องเป็นชั่วโมง (5 วินาที, 5 นาที, 30 นาที, 2 ชม., 5 ชม., 10 ชม.) การปฏิเสธ event ที่เราไม่ได้ใช้จึงได้แค่ redelivery ยาว ๆ โดยไม่ได้อะไร event ที่ไม่รู้จัก, email id ที่ไม่รู้จัก และ body ที่ parse ไม่ได้ ถูกตอบรับทั้งหมด
+
+Turnstile ไม่เกี่ยวเพราะผู้เรียกเป็น server ไม่ใช่คน CSRF ก็ไม่เกี่ยวเพราะไม่มี browser session อยู่ในเส้นทางนี้ การกันปริมาณเป็นงานของ edge rate-limiting rule ใน `docs/owner-actions.md` เพราะการ drop delivery event จริงคือการเสียมันไปถาวร
+
+Resend ส่งแบบ at-least-once และเอกสารของเขาเตือนว่า event **อาจมาไม่เรียงลำดับ** ดังนั้นไม่มีอะไรในนี้สมมติลำดับ: `email.delivered` เลื่อนสถานะได้เฉพาะจาก `QUEUED`/`SENT` เท่านั้น `email.bounced` ที่มาก่อนจึงไม่ถูก `email.delivered` ที่มาช้าทับ และ `email.sent` ถือเป็น metadata ไม่แตะสถานะ เพราะเส้นทางส่งของเราบันทึกไว้แล้วด้วย id เดียวกัน
+
+### สองทางเข้าสู่ NBTC_PROCESSING
+
+ผู้จัดการเปิดอีเมล (`email.opened`) หรือกดปุ่มในอีเมล ทั้งสองทางอยู่ใน `email-events.ts` ไฟล์เดียวกันโดยตั้งใจ เพราะข้อกำหนดคือสมาชิกต้องได้รับอีเมล "อยู่ระหว่างดำเนินการ" **ครั้งเดียว** ไม่ว่าทางไหนมาก่อนหรือมากี่ครั้ง (หัวข้อ 34 และ 56) ซึ่งตรวจสอบได้เมื่อทั้งสองทางผ่าน guard เดียวกัน
+
+guard นั้นคือ compare-and-set ของ state machine — **เฉพาะผู้เรียกที่ transition ได้ `APPLIED` เท่านั้นที่ส่งอีเมล** `email.opened` สิบครั้งกับการกดปุ่มแทรกกลางจึงได้อีเมลหนึ่งฉบับ ทางเลือกอื่นคืออ่านสถานะแล้วตัดสิน ซึ่งมีช่องว่างระหว่างการอ่านกับการเขียนที่ทำให้ผู้เรียกทั้งสองเห็นค่าเดียวกัน (test ยืนยันด้วยการยิงพร้อมกัน และการเปลี่ยน guard ให้หลวมทำให้ test fail ด้วยอีเมลสองฉบับ)
+
+อีเมลที่ส่งไม่สำเร็จไม่ย้อนสถานะกลับ ผู้จัดการเริ่มงานไปแล้วจริง การ rollback เพื่อรายงานข้อเท็จจริงหนึ่งจะทำให้เสียข้อเท็จจริงอีกอันไป — แถวอีเมลยังอยู่ให้ retry ได้
 
 ## Decision records
 

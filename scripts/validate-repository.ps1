@@ -65,6 +65,13 @@ $textExtensions = @(
 # protection are both enabled on this repository.
 $secretAssignmentPattern = '(?i)(api[_-]?key|access[_-]?token|client[_-]?secret|private[_-]?key|webhook[_-]?secret)\s*[:=]\s*["'']?(?=[A-Za-z0-9_+/=-]{16,})[A-Za-z0-9_-]*[0-9+/=]'
 
+# Test fixtures need secret-shaped values under secret-shaped names, and there
+# is no way to tell one from a real credential by shape alone. So the value has
+# to say what it is: a literal containing `test-only` or `testonly` is exempt.
+# Real credentials never contain either, so this cannot excuse one by accident,
+# and it makes the convention enforceable rather than a matter of memory.
+$testOnlyMarker = '(?i)test-?only'
+
 foreach ($path in $trackedFiles) {
   $extension = [System.IO.Path]::GetExtension($path).ToLowerInvariant()
   if ($textExtensions -notcontains $extension) {
@@ -76,7 +83,9 @@ foreach ($path in $trackedFiles) {
     $failures.Add("Unresolved merge-conflict marker found in: $path")
   }
   if ($path -ne 'scripts/validate-repository.ps1' -and $content -match $secretAssignmentPattern) {
-    $failures.Add("Possible hard-coded secret assignment found in: $path")
+    if ($Matches[0] -notmatch $testOnlyMarker) {
+      $failures.Add("Possible hard-coded secret assignment found in: $path")
+    }
   }
 }
 
