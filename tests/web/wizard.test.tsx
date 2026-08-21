@@ -133,6 +133,51 @@ describe('the privacy notice', () => {
   });
 });
 
+describe('choosing an image', () => {
+  it('never sets the capture attribute, so the album stays available', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'เริ่มสมัครสมาชิก' }));
+
+    // On Android Chrome `capture` opens the camera and removes the album and
+    // file options. A payment slip is usually already a screenshot, so the
+    // attribute made that step impossible to complete on Android.
+    const inputs = document.querySelectorAll('input[type="file"]');
+    expect(inputs.length).toBeGreaterThan(0);
+    for (const input of inputs) {
+      expect(input.hasAttribute('capture')).toBe(false);
+    }
+  });
+
+  it('still accepts a file that was chosen', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'เริ่มสมัครสมาชิก' }));
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(
+      input,
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], 'card.jpg', {
+        type: 'image/jpeg',
+      }),
+    );
+
+    // The OCR call is what proves the selection reached the wizard.
+    await waitFor(() => expect(calls.some((call) => call.url === '/api/ocr')).toBe(true));
+  });
+
+  it('says an existing photo is fine', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'เริ่มสมัครสมาชิก' }));
+
+    expect(screen.getByText(/ใช้ภาพที่มีอยู่แล้วในเครื่องก็ได้/)).toBeInTheDocument();
+  });
+});
+
 describe('the card step', () => {
   it('offers manual entry before anything has failed', async () => {
     const user = userEvent.setup();
