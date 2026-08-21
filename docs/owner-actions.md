@@ -35,6 +35,7 @@ pwsh -File ./scripts/set-production-secrets.ps1
 | `MANAGER_EMAIL`                                              | email ผู้จัดการสมาคม                         |
 | `EMAIL_FROM`                                                 | sender ของ transactional email               |
 | `VRA_BANK_NAME`, `VRA_BANK_ACCOUNT`, `VRA_BANK_ACCOUNT_NAME` | ข้อมูลบัญชีสมาคม                             |
+| `EMAIL_FROM_TRACKED` (ไม่บังคับ)                             | sender แยกสำหรับ open tracking — ดูข้อ 2     |
 
 > **`PII_ENCRYPTION_KEY` เปลี่ยนไม่ได้หลังมีข้อมูลจริง** ciphertext ของเลขบัตรและ hash ที่ใช้ค้นหาซ้ำ derive จาก key นี้ทั้งคู่ และไม่มีสำเนา plaintext เก็บไว้ที่ไหนเลย **สำรอง key ไว้ที่ปลอดภัยและออฟไลน์ก่อนลบไฟล์ค่า** ถ้า key หาย เลขบัตรทุกใบอ่านไม่ได้อีกเลย
 >
@@ -48,6 +49,8 @@ pwsh -File ./scripts/set-production-secrets.ps1
 - [ ] **Custom domain** — ผูก `member.vra.or.th` เข้ากับ Worker `vra-membership` (`wrangler.jsonc` ประกาศ route ไว้แล้ว จะถูกสร้างตอน deploy ครั้งแรก แต่ DNS ต้องพร้อม)
 - [ ] **Cloudflare Access application** — ครอบ `/admin*` และ `/api/admin/*` กำหนดผู้ใช้ที่เข้าได้ (ผู้จัดการสมาคม + ผู้ดูแล) ใช้จริงเมื่อ #16 เสร็จ
 - [ ] **Edge rate limiting rule** — สำหรับ `/api/ocr`, `/api/payment/verify`, `/api/member-photo` ระบบมี rate limiting ใน application layer อยู่แล้ว แต่ rule ที่ edge หยุด traffic ก่อนถึง Worker จึงกันทั้งค่า invocation และค่า D1 write ที่ counter ใช้
+- [ ] **Resend — open tracking แยก sender (ไม่บังคับ)** — Resend เปิด open tracking ที่ระดับ domain ไม่มี field ต่อ message ถ้าเปิดบน domain ที่ส่งอีเมลสมาชิก อีเมลสมาชิกจะถูก track ด้วย ซึ่งขัดกับข้อกำหนดที่ให้ track เฉพาะอีเมลผู้จัดการ วิธีที่ตรงตามข้อกำหนดคือ verify subdomain แยก (เช่น `notify.vra.or.th`) เปิด open tracking บน subdomain นั้น แล้วใส่เป็น `EMAIL_FROM_TRACKED`
+      **ถ้าไม่ทำ** ระบบยังทำงานครบ เพียงแต่การที่ผู้จัดการเปิดอีเมลจะไม่ขยับสถานะใบสมัครเอง ผู้จัดการต้องกดปุ่ม "รับเรื่อง / เริ่มดำเนินการ" ซึ่งมีอยู่ในอีเมลและในระบบผู้จัดการแล้ว
 - [ ] **API token สำหรับ CI** — สร้างแบบ least privilege: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit เฉพาะบัญชีนี้ ต้องเป็น token แยกจาก CLI session ที่ใช้ provisioning
 
 ---

@@ -5,7 +5,7 @@ import { createRepository } from './db';
 import { ConfigurationError, readConfig } from './env';
 import { ApiError, errorBody, statusForErrorCode } from './lib/http';
 import { createLogger } from './lib/logger';
-import { ProviderNotConfiguredError, createProviders } from './providers';
+import { createProviders } from './providers';
 import { ValidationError, createSecurityServices, validationErrorBody } from './security';
 import { PaymentRejectedError } from './services/payment';
 import { healthRoutes } from './routes/health';
@@ -15,7 +15,6 @@ import { OcrFailedError, ocrRoutes } from './routes/ocr';
 import { paymentRoutes } from './routes/payment';
 
 const GENERIC_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่อีกครั้ง';
-const PROVIDER_ERROR_MESSAGE = 'ไม่สามารถเชื่อมต่อบริการภายนอกได้ กรุณาลองใหม่อีกครั้ง';
 
 /**
  * `CF-Ray` lets a request be correlated with Cloudflare's own logs, but it
@@ -125,11 +124,6 @@ app.onError((error, c) => {
       errorBody(error.code, error.publicMessage, requestId),
       statusForErrorCode(error.code) as ContentfulStatusCode,
     );
-  }
-
-  if (error instanceof ProviderNotConfiguredError) {
-    logger.error({ event: 'provider.unavailable', provider: error.provider });
-    return c.json(errorBody('PROVIDER_UNAVAILABLE', PROVIDER_ERROR_MESSAGE, requestId), 503);
   }
 
   if (error instanceof ConfigurationError) {

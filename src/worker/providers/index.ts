@@ -1,6 +1,7 @@
 import { requireSecret } from '../env';
 import type { WorkerEnv } from '../env';
 import { createIappOcrProvider } from './iapp';
+import { createResendProvider } from './resend';
 import { createSlipOkProvider } from './slipok';
 import { createMockEmailProvider } from './mock/email';
 import { createMockOcrProvider } from './mock/ocr';
@@ -10,26 +11,13 @@ import type { Providers } from './types';
 export * from './types';
 
 /**
- * Thrown when a live adapter is requested before it exists or before its secret
- * is configured. Surfaces as `PROVIDER_UNAVAILABLE` rather than leaking details.
- */
-export class ProviderNotConfiguredError extends Error {
-  readonly provider: string;
-
-  constructor(provider: string) {
-    super(`Live provider adapter is not available: ${provider}`);
-    this.name = 'ProviderNotConfiguredError';
-    this.provider = provider;
-  }
-}
-
-/**
  * Resolves the provider set for a request.
  *
  * `PROVIDER_MODE=mock` is the default for development and the only mode used by
- * automated tests. Live adapters for iApp, SlipOK and Resend are added by their
- * own issues; until then requesting `live` fails loudly instead of silently
- * falling back to mocks in production.
+ * automated tests. Each adapter is constructed lazily by a getter so a request
+ * that never sends email does not require the email secrets to be configured,
+ * and a missing secret fails loudly at the point of use rather than silently
+ * falling back to a mock in production.
  */
 export function createProviders(env: WorkerEnv): Providers {
   if (env.PROVIDER_MODE === 'mock') {
@@ -50,8 +38,17 @@ export function createProviders(env: WorkerEnv): Providers {
         branchId: requireSecret(env, 'SLIPOK_BRANCH_ID'),
       });
     },
-    get email(): never {
-      throw new ProviderNotConfiguredError('resend');
+    get email() {
+      // Open tracking is a property of the sending domain in Resend, so asking
+      // for it means sending from a different, separately configured sender.
+      // Without `EMAIL_FROM_TRACKED` the manager's opens are simply not
+      // tracked, which the flow already tolerates (Issue #1 section 34).
+      const trackedFrom = env['EMAIL_FROM_TRACKED'];
+      return createResendProvider({
+        apiKey: requireSecret(env, 'RESEND_API_KEY'),
+        from: requireSecret(env, 'EMAIL_FROM'),
+        ...(typeof trackedFrom === 'string' && trackedFrom.length > 0 ? { trackedFrom } : {}),
+      });
     },
   };
 }

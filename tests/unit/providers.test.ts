@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigurationError } from '../../src/worker/env';
 import type { WorkerEnv } from '../../src/worker/env';
-import { ProviderNotConfiguredError, createProviders } from '../../src/worker/providers';
+import { createProviders } from '../../src/worker/providers';
 import { createMockEmailProvider } from '../../src/worker/providers/mock/email';
 import { createMockOcrProvider } from '../../src/worker/providers/mock/ocr';
 import { createMockSlipProvider } from '../../src/worker/providers/mock/slip';
@@ -76,10 +76,18 @@ describe('createProviders', () => {
     expect(() => providers.slip).toThrow(/SLIPOK_BRANCH_ID/);
   });
 
-  it('still reports email as not implemented', () => {
-    const providers = createProviders(fakeEnv('live', { IAPP_API_KEY: 'test-only-key' }));
+  it('reports which email secret is missing', () => {
+    const providers = createProviders(fakeEnv('live', { RESEND_API_KEY: 'test-only-key' }));
 
-    expect(() => providers.email).toThrow(ProviderNotConfiguredError);
+    expect(() => providers.email).toThrow(/EMAIL_FROM/);
+  });
+
+  it('builds the live email adapter once its secrets are present', () => {
+    const providers = createProviders(
+      fakeEnv('live', { RESEND_API_KEY: 'test-only-key', EMAIL_FROM: 'vra@example.test' }),
+    );
+
+    expect(providers.email.name).toBe('resend');
   });
 });
 

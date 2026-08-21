@@ -44,6 +44,7 @@ src/worker/            Cloudflare Worker (Hono)
     member-photo.ts    the only image the system keeps
     payment.ts         the five checks that accept a payment
     receipt.ts         receipt issuing and regeneration
+    email.ts           transactional email, recorded per message
   lib/logger.ts        allowlist logger; the only sanctioned console sink
   lib/time.ts          Asia/Bangkok conversion and Buddhist-era years
   lib/http.ts          API error codes and applicant-safe messages
@@ -54,9 +55,13 @@ src/worker/            Cloudflare Worker (Hono)
   lib/promptpay.ts     Thai QR Payment payload with an exact amount
   lib/pdf/fonts.ts     Sarabun embedding, subsetted per document
   lib/pdf/receipt.ts   the receipt document itself
+  lib/association.ts   the association's own name and public links
+  emails/layout.ts     block renderer producing HTML and text together
+  emails/templates.ts  the four transactional templates
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/iapp/      Thai national ID OCR adapter; narrows the response
   providers/slipok/    payment slip verification adapter
+  providers/resend/    transactional email adapter and webhook signatures
   providers/mock/      deterministic adapters used by development and tests
 assets/fonts/          Sarabun (OFL), vendored so a receipt never needs the network
 src/web/               React client, built to dist/client
@@ -223,6 +228,30 @@ Sarabun จัดตำแหน่งสระและวรรณยุกต
 ผลข้างเคียงที่ทราบแล้วอย่างหนึ่ง: สระอำถูกจัดรูปเป็น นิคหิต + สระอา และสระอาที่ใช้เป็น glyph **ตัวเดียวกัน** กับสระอาเดี่ยว pdf-lib เขียน `/ToUnicode` หนึ่งรายการต่อ glyph จากบริบทแรกที่พบ จึงเสียการอ่านย้อนกลับไปหนึ่งแบบต่อ font glyph ที่วาดถูกต้องเสมอ **หน้าจอและกระดาษจึงถูกต้อง** ที่คลาดเคลื่อนคือการ copy ข้อความออกจากไฟล์เท่านั้น test เปรียบเทียบโดยตัดสระอา/อำ ออกจากทั้งสองฝั่ง (`tests/support/pdf-text.ts`) ตัวอื่นทั้งหมดยังตรวจตรงตัวรวมทั้งลำดับ
 
 Endpoint สำหรับ admin regenerate ยังไม่เปิด เพราะสิทธิ์ในการดึงเอกสารที่มี PII ต้องผ่าน admin authentication ซึ่งมาพร้อม Cloudflare Access ใน #16 — service มี `render()` พร้อมแล้วและรอเพียงชั้นสิทธิ์
+
+## Email
+
+สี่แบบตาม Issue #1 หัวข้อ 55 และทุกแบบมีทั้ง HTML และ plain text โดย **ทั้งสองรูปแบบถูก render จาก block list เดียวกัน** ไม่ได้เขียนแยกกัน plain-text ที่เขียนมือจะเริ่มไม่ตรงกับ HTML ตั้งแต่การแก้ครั้งแรก และคนที่ได้ text version คือคนที่มีทางเลี่ยงน้อยที่สุด
+
+HTML เขียนแบบเก่าโดยตั้งใจ — table, inline style, คอลัมน์เดียว, กว้างไม่เกิน 600px เพราะ email client ตัด `<style>` และไม่รองรับ layout สมัยใหม่ คอลัมน์เดียวคือสิ่งที่ทำให้อ่านบนมือถือได้โดยไม่ต้องมี media query เลย
+
+**อีเมลที่ส่งไม่สำเร็จไม่ทำให้สิ่งที่มันรายงานล้มเหลว** ตอนส่งอีเมลใบเสร็จ สมาคมได้เงินและออกเลขใบสำคัญรับเงินไปแล้ว ถ้า Resend ล่ม ข้อเท็จจริงเหล่านั้นต้องยังเป็นจริง การส่งจึงบันทึกผลของตัวเองแล้ว return ไม่ throw และสิ่งเดียวที่ throw คือการถามถึงใบสมัครที่ไม่มีอยู่
+
+แถวใน `emails` ถูกสร้าง **ก่อน** เรียก provider เพราะการส่งที่ timeout อาจถึงผู้รับไปแล้ว ถ้าไม่มีแถวก็ไม่มีอะไรให้ retry และไม่มีอะไรให้ webhook ที่ตามมาจับคู่ `retry` ใช้แถวเดิม จึงใช้ idempotency key เดิม — Resend จะคืน message เดิมภายใน 24 ชั่วโมงแทนที่จะส่งซ้ำ ที่ทำได้เพราะ template ทุกตัวเป็น pure function ของข้อมูลที่เก็บไว้ ถ้าเนื้อหาต่างกันระหว่างสองครั้ง Resend จะตอบ `invalid_idempotent_request` ไม่ใช่ deduplicate
+
+### อีเมลผู้จัดการ
+
+ไม่แนบรูปบัตรประชาชน รูปสลิป หรือรูปสมาชิกเลย (หัวข้อ 31) ทุกอย่างเป็น link เข้าระบบผู้จัดการ และ link ทั้งสามพาไปหน้ายืนยัน ไม่มี GET ใดเปลี่ยนสถานะ เพราะ email security scanner เปิด URL เองได้ (หัวข้อ 37)
+
+เลขบัตรประชาชนแสดงเพียงสี่หลักท้ายในตำแหน่งจริงบนบัตร ดู `docs/decisions/0002-citizen-id-not-in-email.md` การถอดรหัสเพื่อ mask ยังบันทึก audit event เหมือนการอ่านครั้งอื่น
+
+### Open tracking
+
+Resend ไม่มี field ต่อ message สำหรับ open tracking — มันเป็นคุณสมบัติของ sending domain ดังนั้น `trackOpens` จึงเลือก **sender อีกตัว** (`EMAIL_FROM_TRACKED`) ที่ตั้ง open tracking ไว้ แทนการ set field ถ้าไม่ตั้ง sender ตัวที่สอง `trackOpens` จะไม่มีผลและ open ของผู้จัดการจะไม่ขยับสถานะใบสมัคร ซึ่งรับได้เพราะผู้จัดการมีปุ่มกดเองอยู่แล้วและไม่มีขั้นตอนใดพึ่ง tracking เพียงทางเดียว (หัวข้อ 34)
+
+### Webhook signature
+
+Resend เซ็นด้วย Svix: HMAC-SHA256 บน `${svix-id}.${svix-timestamp}.${raw body}` โดย secret ตัด `whsec_` ออกแล้ว base64-decode `payload` ต้องเป็น body ดิบ byte ต่อ byte — การ serialize JSON ที่ parse แล้วใหม่จะเปลี่ยน whitespace และ signature ทุกตัวจะไม่ตรง (test ยืนยันด้วย vector ที่ Svix เผยแพร่เอง) การเทียบเป็น constant time และปฏิเสธ timestamp ที่ห่างเกิน 5 นาที เพราะ signature ที่ถูกต้องจะถูกต้องตลอดไป ถ้าไม่ตรวจเวลาก็ replay ได้ไม่จำกัด
 
 ## Decision records
 
