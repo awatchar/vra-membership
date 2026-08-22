@@ -26,6 +26,7 @@ import { ContactStep } from './steps/ContactStep';
 import { IdentityStep } from './steps/IdentityStep';
 import { MembershipStep } from './steps/MembershipStep';
 import { PaymentStep } from './steps/PaymentStep';
+import { PaymentReviewStep } from './steps/PaymentReviewStep';
 import { PhotoStep } from './steps/PhotoStep';
 import { PrivacyStep } from './steps/PrivacyStep';
 
@@ -344,13 +345,13 @@ export function App() {
     if (!evidence) return;
 
     void run(async () => {
-      const verified = await api.verifyPayment(
-        state.applicationId!,
-        evidence,
-        token,
-        turnstileToken,
-      );
-      dispatch({ type: 'CONFIRMED', report: verified });
+      const result = await api.verifyPayment(state.applicationId!, evidence, token, turnstileToken);
+      resetTurnstile();
+      if ('manualReview' in result) {
+        dispatch({ type: 'MANUAL_PAYMENT_REVIEW_REQUESTED', review: result });
+      } else {
+        dispatch({ type: 'CONFIRMED', report: result });
+      }
     });
   };
 
@@ -513,6 +514,13 @@ export function App() {
               busy={busy}
               error={error}
               onRetry={retryOutstanding}
+            />
+          ) : null}
+
+          {state.step === 'payment-review' && state.manualPaymentReview ? (
+            <PaymentReviewStep
+              review={state.manualPaymentReview}
+              onRetryAutomatic={() => dispatch({ type: 'GO_TO', step: 'payment' })}
             />
           ) : null}
 

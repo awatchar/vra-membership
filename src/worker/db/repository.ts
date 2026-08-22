@@ -4,6 +4,7 @@ import {
   toApplicationEventRecord,
   toApplicationRecord,
   toEmailRecord,
+  toPaymentReviewRecord,
   toPaymentRecord,
   toReceiptRecord,
 } from './mappers';
@@ -22,6 +23,8 @@ import type {
   EmailType,
   MembershipType,
   PaymentInput,
+  PaymentReviewRecord,
+  PaymentReviewStatus,
   PaymentRecord,
   PhotoSource,
   ReceiptInput,
@@ -135,14 +138,29 @@ export interface AddressRepository {
 
 export interface PaymentRepository {
   /**
-   * Records a verified payment. Throws `UniqueConstraintError` when the
-   * transaction reference was already used, which is the database-level
-   * duplicate-slip guard.
+   * Records a verified payment. Throws `UniqueConstraintError` when either the
+   * application was already paid or the transaction reference was already
+   * used. Those are the database-level concurrent and duplicate-slip guards.
    */
   create(input: PaymentInput): Promise<PaymentRecord>;
   findById(id: string): Promise<PaymentRecord | null>;
   findByTransactionRef(transactionRef: string): Promise<PaymentRecord | null>;
   findByApplicationId(applicationId: string): Promise<PaymentRecord[]>;
+}
+
+export interface PaymentReviewRepository {
+  /** Creates the one review request for an application, or returns the existing one. */
+  createIfMissing(
+    applicationId: string,
+  ): Promise<{ record: PaymentReviewRecord; created: boolean }>;
+  findByApplicationId(applicationId: string): Promise<PaymentReviewRecord | null>;
+  listPendingApplicationIds(): Promise<string[]>;
+  /** Resolves only a pending request. Returns false after another path won the race. */
+  resolveIfPending(
+    applicationId: string,
+    status: Exclude<PaymentReviewStatus, 'PENDING'>,
+    actorId?: string | null,
+  ): Promise<boolean>;
 }
 
 export interface ReceiptRepository {
@@ -197,6 +215,7 @@ export interface Repository {
   applications: ApplicationRepository;
   addresses: AddressRepository;
   payments: PaymentRepository;
+  paymentReviews: PaymentReviewRepository;
   receipts: ReceiptRepository;
   emails: EmailRepository;
   events: EventRepository;
@@ -612,6 +631,55 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
   };
 
+  const paymentReviews: PaymentReviewRepository = {
+    async createIfMissing(applicationId) {
+      const result = await run(
+        db
+          .prepare(
+            `insert into payment_reviews (
+               application_id, reason, status, requested_at
+             ) values (?, 'SLIP_UNREADABLE', 'PENDING', ?)
+             on conflict (application_id) do nothing`,
+          )
+          .bind(applicationId, isoNow(now)),
+      );
+      const record = await paymentReviews.findByApplicationId(applicationId);
+      if (!record) throw new Error('Payment review was not persisted');
+      return { record, created: result.meta.changes > 0 };
+    },
+
+    async findByApplicationId(applicationId) {
+      const row = await first(
+        db.prepare('select * from payment_reviews where application_id = ?').bind(applicationId),
+      );
+      return row ? toPaymentReviewRecord(row) : null;
+    },
+
+    async listPendingApplicationIds() {
+      const rows = await all(
+        db.prepare(
+          `select application_id from payment_reviews
+           where status = 'PENDING' order by requested_at asc`,
+        ),
+      );
+      return rows
+        .map((row) => row['application_id'])
+        .filter((value): value is string => typeof value === 'string');
+    },
+
+    async resolveIfPending(applicationId, status, actorId = null) {
+      const result = await run(
+        db
+          .prepare(
+            `update payment_reviews set status = ?, resolved_at = ?, resolved_by = ?
+             where application_id = ? and status = 'PENDING'`,
+          )
+          .bind(status, isoNow(now), status === 'APPROVED' ? actorId : null, applicationId),
+      );
+      return result.meta.changes > 0;
+    },
+  };
+
   const receipts: ReceiptRepository = {
     async create(input) {
       const id = newId();
@@ -889,5 +957,14 @@ export function createRepository(db: D1Database, options: RepositoryOptions = {}
     },
   };
 
-  return { applications, addresses, payments, receipts, emails, events, rateLimits };
+  return {
+    applications,
+    addresses,
+    payments,
+    paymentReviews,
+    receipts,
+    emails,
+    events,
+    rateLimits,
+  };
 }

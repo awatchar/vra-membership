@@ -2,6 +2,8 @@
 
 Production target คือ Cloudflare Workers ที่ `member.vra.or.th` พร้อม D1, private R2, Turnstile และ Cloudflare Access
 
+`EMAIL_CC` เป็นค่าตั้งสาธารณะใน `wrangler.jsonc` สำหรับ CC อีเมล transactional ทุกฉบับ ไม่ใช่ secret และต้องตรวจผู้รับก่อนเปลี่ยนค่า
+
 Pipeline ประกอบด้วยสาม workflow
 
 | Workflow                                          | Trigger                           | หน้าที่                                                               |

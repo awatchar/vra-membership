@@ -64,6 +64,7 @@ interface CallOptions {
   inCookie?: boolean;
   csrf?: { cookie?: string; header?: string } | null;
   origin?: string | null;
+  json?: unknown;
 }
 
 async function call(path: string, options: CallOptions = {}): Promise<Response> {
@@ -87,7 +88,16 @@ async function call(path: string, options: CallOptions = {}): Promise<Response> 
 
   if (cookies.length > 0) headers.set('cookie', cookies.join('; '));
 
-  return exports.default.fetch(new Request(`http://localhost${path}`, { method, headers }));
+  const body = options.json === undefined ? undefined : JSON.stringify(options.json);
+  if (body) headers.set('content-type', 'application/json');
+
+  return exports.default.fetch(
+    new Request(`http://localhost${path}`, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+    }),
+  );
 }
 
 function paymentInput(applicationId: string): PaymentInput {
@@ -787,6 +797,56 @@ describe('admin finalize', () => {
     expect(response.status).toBe(200);
     expect(body.confirmation.complete).toBe(true);
     expect(body.confirmation.status).toBe('MANAGER_NOTIFIED');
+  });
+});
+
+describe('manual payment review approval', () => {
+  it('requires Access and CSRF, records the manager approval, and resumes the workflow', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+    await repo.applications.updateContact(id, { email: APPLICANT_EMAIL, phone: '0800000000' });
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
+    await createStateMachine(repo).transition(id, 'AWAITING_PAYMENT');
+    await repo.paymentReviews.createIfMissing(id);
+
+    const response = await call(`/api/admin/applications/${id}/payment-review/approve`, {
+      method: 'POST',
+      json: { transactionRef: 'BANK-STATEMENT-0001' },
+    });
+    const body = await response.json<{
+      approved: boolean;
+      confirmation: { complete: boolean; status: string };
+    }>();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      approved: true,
+      confirmation: { complete: true, status: 'MANAGER_NOTIFIED' },
+    });
+    await expect(repo.paymentReviews.findByApplicationId(id)).resolves.toMatchObject({
+      status: 'APPROVED',
+      resolvedBy: MANAGER,
+    });
+    await expect(repo.payments.findByApplicationId(id)).resolves.toEqual([
+      expect.objectContaining({
+        provider: 'manual-bank-statement',
+        transactionRef: 'BANK-STATEMENT-0001',
+        amountSatang: FIVE_YEAR_SATANG,
+      }),
+    ]);
+  });
+
+  it('refuses the approval without the CSRF double submit', async () => {
+    const response = await call(
+      `/api/admin/applications/11111111-2222-4333-8444-555555555555/payment-review/approve`,
+      {
+        method: 'POST',
+        csrf: null,
+        json: { transactionRef: 'BANK-STATEMENT-0002' },
+      },
+    );
+
+    expect(response.status).toBe(403);
   });
 });
 

@@ -49,6 +49,7 @@
     "ENVIRONMENT": "development",
     "PROVIDER_MODE": "mock",
     "APP_BASE_URL": "http://localhost:8787",
+    "EMAIL_CC": "awatchar@vra.or.th",
     // The association's own contact details, shown in the site footer. These are
     // public information the owner has confirmed may be published, so they live
     // here as reviewable defaults rather than as secrets - there is nothing to
@@ -92,6 +93,7 @@
         "ENVIRONMENT": "production",
         "PROVIDER_MODE": "live",
         "APP_BASE_URL": "https://member.vra.or.th",
+        "EMAIL_CC": "awatchar@vra.or.th",
         // The association's own contact details, shown in the site footer. These are
         // public information the owner has confirmed may be published, so they live
         // here as reviewable defaults rather than as secrets - there is nothing to

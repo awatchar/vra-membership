@@ -210,6 +210,8 @@ export function createResendProvider(options: ResendOptions): EmailProvider {
         text: email.text,
       };
 
+      if (email.cc?.length) body['cc'] = email.cc;
+
       if (email.attachments?.length) {
         body['attachments'] = email.attachments.map((attachment) => ({
           filename: attachment.filename,

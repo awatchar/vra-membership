@@ -35,6 +35,7 @@ export type PhotoSource = (typeof PHOTO_SOURCES)[number];
 export const EMAIL_TYPES = [
   'RECEIPT',
   'MANAGER_NEW_APPLICATION',
+  'MANAGER_PAYMENT_REVIEW',
   'MEMBER_PROCESSING',
   'MEMBER_NBTC_COMPLETED',
 ] as const;
@@ -137,6 +138,19 @@ export interface PaymentRecord {
 }
 
 export type PaymentInput = Omit<PaymentRecord, 'id' | 'createdAt'>;
+
+export const PAYMENT_REVIEW_STATUSES = ['PENDING', 'APPROVED', 'AUTOMATICALLY_VERIFIED'] as const;
+export type PaymentReviewStatus = (typeof PAYMENT_REVIEW_STATUSES)[number];
+
+/** No slip image or provider payload is represented by this record. */
+export interface PaymentReviewRecord {
+  applicationId: string;
+  reason: 'SLIP_UNREADABLE';
+  status: PaymentReviewStatus;
+  requestedAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
 
 export interface ReceiptRecord {
   id: string;

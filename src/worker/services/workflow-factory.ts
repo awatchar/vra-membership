@@ -32,6 +32,7 @@ export async function buildApplicationWorkflow(
 
   const emails = createEmailService(db, emailProvider, receipts, audit, {
     managerEmail: requireSecret(env, 'MANAGER_EMAIL'),
+    ccEmail: requireSecret(env, 'EMAIL_CC'),
     appBaseUrl,
     // Only the manager notification uses this, to show four digits of the
     // citizen ID; see docs/decisions/0002-citizen-id-not-in-email.md.

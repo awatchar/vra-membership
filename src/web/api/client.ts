@@ -2,7 +2,7 @@ import type {
   CreatedApplication,
   OcrResponse,
   PaymentInstructions,
-  PaymentVerified,
+  PaymentResult,
   PhotoSource,
   PublicConfig,
   StoredPhoto,
@@ -237,13 +237,13 @@ export const api = {
     evidence: { qrPayload: string } | { slip: Blob },
     applicationToken: string,
     turnstileToken: string | null,
-  ): Promise<PaymentVerified> {
+  ): Promise<PaymentResult> {
     const form = new FormData();
     form.append('applicationId', applicationId);
     if ('qrPayload' in evidence) form.append('qrPayload', evidence.qrPayload);
     else form.append('slip', evidence.slip, 'slip.jpg');
 
-    return send<PaymentVerified>('/api/payment/verify', { method: 'POST', body: form }, {
+    return send<PaymentResult>('/api/payment/verify', { method: 'POST', body: form }, {
       applicationToken,
       turnstileToken,
     });

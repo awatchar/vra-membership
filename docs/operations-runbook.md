@@ -46,6 +46,7 @@ npx wrangler d1 execute DB --env production --remote --command \
 
 - iApp ล่ม/timeout: ให้ผู้สมัครลองใหม่หรือใช้ manual entry; ห้ามเก็บภาพบัตรเพื่อ retry ภายหลัง
 - SlipOK ล่ม/timeout: ไม่เปลี่ยนสถานะ payment และไม่เก็บภาพสลิป ให้ผู้สมัคร retry ด้วย transaction เดิม ระบบ duplicate guard ป้องกันการใช้ซ้ำ
+- SlipOK ตอบว่าอ่านภาพไม่ได้: ระบบสร้างคำขอในคิวผู้จัดการโดยไม่เก็บภาพ เปิดรายละเอียดใบสมัคร ตรวจยอด/ผู้โอนจากรายการเดินบัญชีสมาคม กรอกเลขอ้างอิงธุรกรรม ติ๊กยืนยัน แล้วกดยืนยันการชำระเงิน ห้ามยืนยันจากอีเมลหรือภาพสลิปเพียงอย่างเดียว
 - Resend ล่ม: email record/idempotency key เดิมต้องถูกใช้ในการ retry ห้ามสร้าง email row ใหม่เพื่อ “ลองอีกครั้ง”
 - Turnstile ล่ม: live endpoints fail closed ห้ามเปลี่ยน production เป็น mock หรือปิด verification
 - Cloudflare Access ล่ม: admin fail closed; งานสมัคร public ที่ไม่พึ่ง admin ทำต่อได้

@@ -113,6 +113,8 @@ export interface EmailAttachment {
 
 export interface OutboundEmail {
   to: string;
+  /** Operational copy recipients. Omitted when the primary recipient is the same address. */
+  cc?: string[];
   subject: string;
   html: string;
   /** Required: every template ships a plain-text fallback (Issue #1 section 55). */

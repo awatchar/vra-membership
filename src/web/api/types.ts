@@ -145,3 +145,13 @@ export interface PaymentVerified extends WorkflowReport {
   amountSatang: number;
   amountBaht: string;
 }
+
+export interface ManualPaymentReview {
+  verified: false;
+  manualReview: true;
+  status: 'PENDING';
+  notificationSent: boolean;
+  message: string;
+}
+
+export type PaymentResult = PaymentVerified | ManualPaymentReview;

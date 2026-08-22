@@ -22,6 +22,7 @@ import { createMemberPhotoService } from '../services/member-photo';
 import { createNbtcCompletion } from '../services/nbtc-completion';
 import { createNumberingService } from '../services/numbering';
 import { createReceiptService } from '../services/receipt';
+import { createPaymentReviewService } from '../services/payment-review';
 import { createStateMachine } from '../services/state-machine';
 import { buildApplicationWorkflow } from '../services/workflow-factory';
 
@@ -44,6 +45,9 @@ import { buildApplicationWorkflow } from '../services/workflow-factory';
  */
 
 const idSchema = z.string().uuid();
+const manualPaymentSchema = z.object({
+  transactionRef: z.string().trim().min(6).max(100),
+});
 
 const MESSAGES = {
   noPhoto: 'ใบสมัครนี้ยังไม่มีรูปสมาชิก',
@@ -239,6 +243,45 @@ export const adminRoutes: Hono<AppContext> = new Hono<AppContext>()
     return c.json({ confirmation: report });
   })
 
+  /** Manager reconciliation when SlipOK could not read the ephemeral image. */
+  .post('/admin/applications/:id/payment-review/approve', async (c) => {
+    const identity = await authenticate(c);
+    assertCsrfProtected(c.req.raw, c.var.config.APP_BASE_URL);
+    const applicationId = idSchema.parse(c.req.param('id'));
+    const input = manualPaymentSchema.parse(await c.req.json());
+    const db = c.var.db;
+    const audit = createAuditLog(db);
+
+    const approved = await createPaymentReviewService(
+      db,
+      await buildEmailService(c),
+      createStateMachine(db),
+      audit,
+      {
+        accountDigits: requireSecret(c.env, 'VRA_BANK_ACCOUNT'),
+        bankName: requireSecret(c.env, 'VRA_BANK_NAME'),
+        accountName: requireSecret(c.env, 'VRA_BANK_ACCOUNT_NAME'),
+      },
+    ).approve(applicationId, input.transactionRef, identity.email);
+
+    const workflow = await buildApplicationWorkflow(
+      c.env,
+      db,
+      c.var.providers.email,
+      c.var.config.APP_BASE_URL,
+    );
+    const report = await workflow.resume(applicationId);
+
+    c.var.logger.info({
+      event: 'payment.manual_review_approved',
+      applicationId,
+      count: approved.amountSatang,
+      reason: report.complete ? 'COMPLETE' : 'INCOMPLETE',
+    });
+    c.header('Cache-Control', 'no-store');
+    return c.json({ approved: true, confirmation: report });
+  })
+
   /**
    * The member photo, streamed through the Worker.
    *
@@ -303,6 +346,7 @@ async function buildEmailService(c: { env: AppContext['Bindings']; var: AppConte
 
   return createEmailService(db, c.var.providers.email, receipts, audit, {
     managerEmail: requireSecret(c.env, 'MANAGER_EMAIL'),
+    ccEmail: c.var.config.EMAIL_CC,
     appBaseUrl: c.var.config.APP_BASE_URL,
     citizenId: await createCitizenIdProtection(requireSecret(c.env, 'PII_ENCRYPTION_KEY')),
   });

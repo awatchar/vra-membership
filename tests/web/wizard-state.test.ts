@@ -46,6 +46,7 @@ describe('moving through the wizard', () => {
 
   it('reports its position for the step indicator', () => {
     expect(stepPosition('privacy')).toEqual({ index: 1, total: 9 });
+    expect(stepPosition('payment-review')).toEqual({ index: 9, total: 9 });
     expect(stepPosition('confirmation')).toEqual({ index: 9, total: 9 });
   });
 
@@ -248,6 +249,28 @@ describe('the payment slip', () => {
     expect(state.slipImage).toBeNull();
     expect(state.step).toBe('confirmation');
     expect(state.confirmation?.referenceNo).toBe('VRA-2569-000001');
+  });
+
+  it('releases an unreadable slip and moves to the durable manual-review result', () => {
+    const state = reduce(
+      { ...INITIAL_STATE, step: 'payment' },
+      { type: 'SET_SLIP', image: image('unclear-slip'), qrPayload: null },
+      {
+        type: 'MANUAL_PAYMENT_REVIEW_REQUESTED',
+        review: {
+          verified: false,
+          manualReview: true,
+          status: 'PENDING',
+          notificationSent: true,
+          message: 'ส่งคำขอตรวจสอบแล้ว',
+        },
+      },
+    );
+
+    expect(state.slipImage).toBeNull();
+    expect(state.slipQrPayload).toBeNull();
+    expect(state.step).toBe('payment-review');
+    expect(state.manualPaymentReview?.status).toBe('PENDING');
   });
 });
 

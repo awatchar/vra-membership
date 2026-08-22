@@ -26,6 +26,7 @@ const TABLES_IN_DELETION_ORDER = [
   'application_events',
   'emails',
   'receipts',
+  'payment_reviews',
   'payments',
   'addresses',
   'applications',

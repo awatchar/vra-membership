@@ -5,6 +5,7 @@ const validConfig = {
   ENVIRONMENT: 'development',
   PROVIDER_MODE: 'mock',
   APP_BASE_URL: 'http://localhost:8787',
+  EMAIL_CC: 'awatchar@vra.or.th',
 };
 
 describe('readConfig', () => {
@@ -22,6 +23,7 @@ describe('readConfig', () => {
         ENVIRONMENT: 'production',
         PROVIDER_MODE: 'mock',
         APP_BASE_URL: 'https://member.vra.or.th',
+        EMAIL_CC: 'awatchar@vra.or.th',
       }),
     ).toThrow(/PROVIDER_MODE/);
   });

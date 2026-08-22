@@ -21,6 +21,7 @@ describe('core tables', () => {
         'applications',
         'emails',
         'payments',
+        'payment_reviews',
         'receipts',
       ]),
     );
@@ -87,9 +88,52 @@ describe('data minimisation', () => {
       expect(columns).not.toContain(forbidden);
     }
   });
+
+  it('keeps manual review metadata image-free', async () => {
+    const { results } = await env.DB.prepare(
+      "select name from pragma_table_info('payment_reviews')",
+    ).all<{ name: string }>();
+    const columns = results.map((row) => row.name);
+    expect(columns).toEqual(
+      expect.arrayContaining(['application_id', 'reason', 'status', 'requested_at']),
+    );
+    for (const forbidden of ['slip', 'image', 'payload', 'transaction_ref']) {
+      expect(columns.some((column) => column.includes(forbidden))).toBe(false);
+    }
+  });
 });
 
 describe('uniqueness guarantees', () => {
+  it('allows only one payment per application at the database level', async () => {
+    const repo = repository();
+    const applicationId = await seedApplication(repo);
+    const payment = {
+      applicationId,
+      provider: 'slipok',
+      amountSatang: 50_000,
+      sendingBank: null,
+      receivingBank: null,
+      receiverAccountDigits: null,
+      transactionAt: null,
+      receiverMatched: true,
+      amountMatched: true,
+      verificationStatus: 'VERIFIED' as const,
+      verifiedAt: null,
+    };
+
+    await repo.payments.create({
+      ...payment,
+      transactionRef: `FIRST-${crypto.randomUUID()}`,
+    });
+
+    await expect(
+      repo.payments.create({
+        ...payment,
+        transactionRef: `SECOND-${crypto.randomUUID()}`,
+      }),
+    ).rejects.toThrow(/application_id/i);
+  });
+
   it('rejects a duplicate transaction reference at the database level', async () => {
     const repo = repository();
     const firstApplication = await seedApplication(repo);
@@ -208,7 +252,12 @@ describe('uniqueness guarantees', () => {
     const repo = repository();
     const applicationId = await seedApplication(repo);
 
-    for (const type of ['RECEIPT', 'MANAGER_NEW_APPLICATION', 'MEMBER_PROCESSING'] as const) {
+    for (const type of [
+      'RECEIPT',
+      'MANAGER_NEW_APPLICATION',
+      'MANAGER_PAYMENT_REVIEW',
+      'MEMBER_PROCESSING',
+    ] as const) {
       await expect(
         repo.emails.create({
           applicationId,

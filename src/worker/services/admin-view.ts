@@ -6,6 +6,7 @@ import type {
   ApplicationStatus,
   MembershipType,
   PaymentRecord,
+  PaymentReviewRecord,
   ReceiptRecord,
   Repository,
 } from '../db';
@@ -57,6 +58,7 @@ export interface AdminListItem {
   amountBaht: string | null;
   submittedAt: string | null;
   createdAt: string;
+  manualPaymentReview: boolean;
 }
 
 export interface AdminDetail {
@@ -95,6 +97,7 @@ export interface AdminDetail {
     transactionAt: string | null;
     verifiedAt: string | null;
   } | null;
+  paymentReview: PaymentReviewRecord | null;
   receipt: { receiptNo: string; amountBaht: string; issuedAt: string } | null;
   /** Which post-payment steps have happened, without attempting any of them. */
   workflow: WorkflowReport;
@@ -144,7 +147,11 @@ export function createAdminView(
 ): AdminViewService {
   return {
     async list(query) {
-      const records = await db.applications.list(query);
+      const [records, pendingReviewIds] = await Promise.all([
+        db.applications.list(query),
+        db.paymentReviews.listPendingApplicationIds(),
+      ]);
+      const pending = new Set(pendingReviewIds);
       return records.map((record) => ({
         id: record.id,
         referenceNo: record.referenceNo,
@@ -155,6 +162,7 @@ export function createAdminView(
           record.membershipAmountSatang === null ? null : formatBaht(record.membershipAmountSatang),
         submittedAt: record.submittedAt,
         createdAt: record.createdAt,
+        manualPaymentReview: pending.has(record.id),
       }));
     },
 
@@ -162,9 +170,10 @@ export function createAdminView(
       const application = await db.applications.findById(applicationId);
       if (!application) throw adminApplicationNotFound();
 
-      const [address, payments, receipt, events, report] = await Promise.all([
+      const [address, payments, paymentReview, receipt, events, report] = await Promise.all([
         db.addresses.findByApplicationId(applicationId),
         db.payments.findByApplicationId(applicationId),
+        db.paymentReviews.findByApplicationId(applicationId),
         db.receipts.findByApplicationId(applicationId),
         db.events.listByApplicationId(applicationId),
         workflow.inspect(applicationId),
@@ -214,6 +223,7 @@ export function createAdminView(
               verifiedAt: payment.verifiedAt,
             }
           : null,
+        paymentReview,
         receipt: receiptView(receipt),
         workflow: report,
         events,

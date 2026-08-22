@@ -21,6 +21,7 @@ interface Recorded {
   url: string;
   method: string;
   headers: Headers;
+  body: BodyInit | null | undefined;
 }
 
 let calls: Recorded[] = [];
@@ -77,6 +78,7 @@ function detailBody(overrides: Partial<AdminDetail['application']> = {}): AdminD
       transactionAt: '2026-08-20T02:30:00.000Z',
       verifiedAt: '2026-08-20T02:31:00.000Z',
     },
+    paymentReview: null,
     receipt: {
       receiptNo: 'VRA-RC-2569-000001',
       amountBaht: '500.00',
@@ -126,6 +128,7 @@ const QUEUE: AdminListItem[] = [
     amountBaht: '500.00',
     submittedAt: '2026-08-20T03:00:00.000Z',
     createdAt: '2026-08-20T02:00:00.000Z',
+    manualPaymentReview: false,
   },
 ];
 
@@ -136,7 +139,12 @@ function route(path: string, body: unknown, status = 200): void {
 function stubFetch(): void {
   globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    calls.push({ url, method: init?.method ?? 'GET', headers: new Headers(init?.headers) });
+    calls.push({
+      url,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+      body: init?.body,
+    });
 
     const key = [...routes.keys()]
       .sort((a, b) => b.length - a.length)
@@ -210,7 +218,7 @@ describe('the queue', () => {
     await waitFor(() => expect(screen.getByText('VRA-2569-000123')).toBeInTheDocument());
     // The default filter is the outstanding work, not everything.
     const listCall = calls.find((call) => call.url.includes('/api/admin/applications?'));
-    expect(listCall?.url).toContain('status=MANAGER_NOTIFIED,NBTC_PROCESSING');
+    expect(listCall?.url).toContain('status=AWAITING_PAYMENT,MANAGER_NOTIFIED,NBTC_PROCESSING');
   });
 
   it('shows a status in words, not only a colour', async () => {
@@ -392,6 +400,47 @@ describe('the detail', () => {
     expect(
       screen.getByRole('button', { name: 'ลองดำเนินการขั้นตอนที่ค้างอีกครั้ง' }),
     ).toBeInTheDocument();
+  });
+
+  it('requires an explicit bank-statement confirmation for manual payment review', async () => {
+    const detail = detailBody({
+      referenceNo: null,
+      status: 'AWAITING_PAYMENT',
+      submittedAt: null,
+    });
+    detail.payment = null;
+    detail.receipt = null;
+    detail.paymentReview = {
+      applicationId: APPLICATION_ID,
+      reason: 'SLIP_UNREADABLE',
+      status: 'PENDING',
+      requestedAt: '2026-08-22T01:00:00.000Z',
+      resolvedAt: null,
+      resolvedBy: null,
+    };
+    route(`/api/admin/applications/${APPLICATION_ID}`, { detail });
+    route(`/api/admin/applications/${APPLICATION_ID}/payment-review/approve`, {
+      approved: true,
+      confirmation: {},
+    });
+    const user = userEvent.setup();
+    render(<AdminApp />);
+
+    const approve = await screen.findByRole('button', {
+      name: 'ยืนยันการชำระเงินและดำเนินใบสมัครต่อ',
+    });
+    expect(approve).toBeDisabled();
+    await user.type(screen.getByLabelText('เลขอ้างอิงธุรกรรมจากรายการเดินบัญชี'), 'BANK-REF-0001');
+    await user.click(screen.getByLabelText(/ยืนยันว่าตรวจพบยอดเงินเข้าบัญชีสมาคม/));
+    expect(approve).toBeEnabled();
+    await user.click(approve);
+
+    await waitFor(() => {
+      const call = calls.find((entry) => entry.url.endsWith('/payment-review/approve'));
+      expect(call?.method).toBe('POST');
+      expect(call?.headers.get(CSRF.header)).toBe(CSRF.token);
+      expect(call?.body).toBe(JSON.stringify({ transactionRef: 'BANK-REF-0001' }));
+    });
   });
 });
 

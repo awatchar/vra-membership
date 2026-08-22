@@ -9,6 +9,8 @@ import type {
   EmailType,
   EventMetadata,
   MembershipType,
+  PaymentReviewRecord,
+  PaymentReviewStatus,
   PaymentRecord,
   PhotoSource,
   ReceiptRecord,
@@ -150,6 +152,17 @@ export function toPaymentRecord(row: Row): PaymentRecord {
     verificationStatus: requiredText(row, 'verification_status') as 'VERIFIED' | 'REJECTED',
     verifiedAt: text(row, 'verified_at'),
     createdAt: requiredText(row, 'created_at'),
+  };
+}
+
+export function toPaymentReviewRecord(row: Row): PaymentReviewRecord {
+  return {
+    applicationId: requiredText(row, 'application_id'),
+    reason: requiredText(row, 'reason') as 'SLIP_UNREADABLE',
+    status: requiredText(row, 'status') as PaymentReviewStatus,
+    requestedAt: requiredText(row, 'requested_at'),
+    resolvedAt: text(row, 'resolved_at'),
+    resolvedBy: text(row, 'resolved_by'),
   };
 }
 
