@@ -404,11 +404,12 @@ describe('payments', () => {
 
   it('names the violated constraint without quoting the value', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const first = await seedApplication(repo, TEST_CITIZEN_ID);
+    const second = await seedApplication(repo, OTHER_TEST_CITIZEN_ID);
     const transactionRef = 'SECRET-LOOKING-REF-0002';
-    await repo.payments.create(paymentInput(id, { transactionRef }));
+    await repo.payments.create(paymentInput(first, { transactionRef }));
 
-    await repo.payments.create(paymentInput(id, { transactionRef })).catch((error: unknown) => {
+    await repo.payments.create(paymentInput(second, { transactionRef })).catch((error: unknown) => {
       expect(error).toBeInstanceOf(UniqueConstraintError);
       expect((error as UniqueConstraintError).constraintName).toContain('transaction_ref');
       expect((error as Error).message).not.toContain(transactionRef);
@@ -417,11 +418,13 @@ describe('payments', () => {
 
   it('lets exactly one of several concurrent slips claim a reference', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
     const transactionRef = 'RACE-REF-0001';
+    const applicationIds = await Promise.all(
+      Array.from({ length: 4 }, (_, index) => seedApplication(repo, `test-citizen-${index}`)),
+    );
 
     const outcomes = await Promise.allSettled(
-      Array.from({ length: 4 }, () => repo.payments.create(paymentInput(id, { transactionRef }))),
+      applicationIds.map((id) => repo.payments.create(paymentInput(id, { transactionRef }))),
     );
 
     expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
