@@ -79,6 +79,18 @@ describe('sending', () => {
     }
   });
 
+  it('passes CC recipients in the provider payload', async () => {
+    const { provider, calls, restore } = providerWith(() => accepted());
+    try {
+      await provider.send(email({ cc: ['copy@example.test'] }));
+
+      const body = await calls[0]!.json<Record<string, unknown>>();
+      expect(body['cc']).toEqual(['copy@example.test']);
+    } finally {
+      restore();
+    }
+  });
+
   it('passes the idempotency key as a header', async () => {
     const { provider, calls, restore } = providerWith(() => accepted());
     try {

@@ -56,6 +56,7 @@ export interface AdminListItem {
   amountBaht: string | null;
   submittedAt: string | null;
   createdAt: string;
+  manualPaymentReview: boolean;
 }
 
 export interface AdminEvent {
@@ -121,6 +122,14 @@ export interface AdminDetail {
     transactionAt: string | null;
     verifiedAt: string | null;
   } | null;
+  paymentReview: {
+    applicationId: string;
+    reason: 'SLIP_UNREADABLE';
+    status: 'PENDING' | 'APPROVED' | 'AUTOMATICALLY_VERIFIED';
+    requestedAt: string;
+    resolvedAt: string | null;
+    resolvedBy: string | null;
+  } | null;
   receipt: { receiptNo: string; amountBaht: string; issuedAt: string } | null;
   workflow: {
     referenceNo: string | null;
@@ -184,8 +193,15 @@ export interface Csrf {
   token: string;
 }
 
-function post<T>(path: string, csrf: Csrf): Promise<T> {
-  return send<T>(path, { method: 'POST', headers: { [csrf.header]: csrf.token } });
+function post<T>(path: string, csrf: Csrf, body?: unknown): Promise<T> {
+  return send<T>(path, {
+    method: 'POST',
+    headers: {
+      [csrf.header]: csrf.token,
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
 }
 
 export const adminApi = {
@@ -217,6 +233,16 @@ export const adminApi = {
 
   finalize(applicationId: string, csrf: Csrf): Promise<unknown> {
     return post(`/api/admin/applications/${applicationId}/finalize`, csrf);
+  },
+
+  approveManualPayment(
+    applicationId: string,
+    transactionRef: string,
+    csrf: Csrf,
+  ): Promise<{ approved: true; confirmation: unknown }> {
+    return post(`/api/admin/applications/${applicationId}/payment-review/approve`, csrf, {
+      transactionRef,
+    });
   },
 
   /** Paths the browser loads directly, with the Access cookie attached. */

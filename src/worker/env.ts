@@ -26,6 +26,7 @@ export interface WorkerConfig {
   ENVIRONMENT: EnvironmentName;
   PROVIDER_MODE: ProviderMode;
   APP_BASE_URL: string;
+  EMAIL_CC: string;
 }
 
 export type WorkerEnv = WorkerBindings & WorkerConfig & Record<string, unknown>;
@@ -34,6 +35,7 @@ const configSchema = z.object({
   ENVIRONMENT: environmentNameSchema,
   PROVIDER_MODE: providerModeSchema,
   APP_BASE_URL: z.string().url(),
+  EMAIL_CC: z.string().email(),
 });
 
 export class ConfigurationError extends Error {
@@ -54,6 +56,7 @@ export function readConfig(env: Record<string, unknown>): WorkerConfig {
     ENVIRONMENT: env['ENVIRONMENT'],
     PROVIDER_MODE: env['PROVIDER_MODE'],
     APP_BASE_URL: env['APP_BASE_URL'],
+    EMAIL_CC: env['EMAIL_CC'],
   });
 
   if (!parsed.success) {

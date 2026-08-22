@@ -11,6 +11,7 @@ import { UniqueConstraintError } from '../db';
 import {
   displayName,
   managerNewApplicationEmail,
+  managerPaymentReviewEmail,
   maskCitizenId,
   memberCompletedEmail,
   memberProcessingEmail,
@@ -74,6 +75,8 @@ export interface EmailService {
   sendReceipt(applicationId: string): Promise<EmailOutcome>;
   /** New application: operational summary to the manager (sections 30-32). */
   sendManagerNewApplication(applicationId: string): Promise<EmailOutcome>;
+  /** Slip unreadable: ask the manager to reconcile the bank statement. */
+  sendManagerPaymentReview(applicationId: string): Promise<EmailOutcome>;
   /** Manager has picked it up: notice to the member (section 35). */
   sendMemberProcessing(applicationId: string): Promise<EmailOutcome>;
   /** Registration recorded: completion notice to the member (section 40). */
@@ -85,6 +88,8 @@ export interface EmailService {
 export interface EmailServiceOptions {
   /** Manager recipient, from configuration; never a hard-coded address. */
   managerEmail: string;
+  /** Address copied on every transactional message. */
+  ccEmail?: string;
   /** Origin of the admin portal, used to build the manager's links. */
   appBaseUrl: string;
   /**
@@ -158,6 +163,7 @@ function dateLabel(value: string | null): string | null {
 const SENT_EVENT_BY_TYPE: Readonly<Record<EmailType, string>> = {
   RECEIPT: 'RECEIPT_EMAIL_SENT',
   MANAGER_NEW_APPLICATION: 'MANAGER_EMAIL_SENT',
+  MANAGER_PAYMENT_REVIEW: 'MANAGER_PAYMENT_REVIEW_EMAIL_SENT',
   MEMBER_PROCESSING: 'MEMBER_PROCESSING_EMAIL_SENT',
   MEMBER_NBTC_COMPLETED: 'MEMBER_COMPLETION_EMAIL_SENT',
 };
@@ -305,6 +311,20 @@ export function createEmailService(
           extras: { trackOpens: true },
         };
       }
+
+      case 'MANAGER_PAYMENT_REVIEW': {
+        if (!application.membershipType) return null;
+        return {
+          recipient: options.managerEmail,
+          rendered: managerPaymentReviewEmail({
+            applicantName: recipientName,
+            membershipLabel: membershipLabel(application),
+            amountBaht: formatBaht(membershipPlan(application.membershipType).amountSatang),
+            detailUrl: `${portal}/admin/applications/${application.id}`,
+          }),
+          extras: {},
+        };
+      }
     }
   };
 
@@ -324,8 +344,14 @@ export function createEmailService(
   };
 
   const dispatch = async (record: EmailRecord, prepared: Prepared): Promise<EmailOutcome> => {
+    const ccAddress = options.ccEmail?.trim() ?? '';
+    const cc =
+      ccAddress.length > 0 && ccAddress.toLowerCase() !== prepared.recipient.trim().toLowerCase()
+        ? [ccAddress]
+        : undefined;
     const result = await provider.send({
       to: prepared.recipient,
+      ...(cc ? { cc } : {}),
       subject: prepared.rendered.subject,
       html: prepared.rendered.html,
       text: prepared.rendered.text,
@@ -409,6 +435,10 @@ export function createEmailService(
 
     sendManagerNewApplication(applicationId) {
       return sendType(applicationId, 'MANAGER_NEW_APPLICATION');
+    },
+
+    sendManagerPaymentReview(applicationId) {
+      return sendType(applicationId, 'MANAGER_PAYMENT_REVIEW');
     },
 
     sendMemberProcessing(applicationId) {

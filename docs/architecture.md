@@ -65,7 +65,7 @@ src/worker/            Cloudflare Worker (Hono)
   lib/pdf/receipt.ts   the receipt document itself
   lib/association.ts   the association's own name and public links
   emails/layout.ts     block renderer producing HTML and text together
-  emails/templates.ts  the four transactional templates
+  emails/templates.ts  transactional email templates
   providers/types.ts   OcrProvider, SlipVerificationProvider, EmailProvider
   providers/iapp/      Thai national ID OCR adapter; narrows the response
   providers/slipok/    payment slip verification adapter
@@ -239,7 +239,9 @@ SlipOK อาจตอบ HTTP 400/code `1014` พร้อมข้อมูล
 
 จำนวนเงินเป็นจำนวนเต็มหน่วยสตางค์ทุกจุด ยอดจาก SlipOK ถูกปัดเป็นสตางค์ที่ขอบระบบ เพื่อให้การเปรียบเทียบทุกครั้งเป็นการเทียบจำนวนเต็ม
 
-รูปสลิปไม่ถูกเก็บ และในเส้นทางหลักมันไม่ถึง Worker เลย: browser อ่าน QR แล้วส่งเฉพาะ payload (Issue #1 หัวข้อ 18)
+รูปสลิปไม่ถูกเก็บ และในเส้นทางหลักมันไม่ถึง Worker เลย: browser อ่าน QR แล้วส่งเฉพาะ payload (Issue #1 หัวข้อ 18) ถ้า browser และ SlipOK ยังอ่านภาพไม่ได้ ระบบจะสร้างคำขอตรวจด้วยคนซึ่งเก็บเฉพาะเหตุผล/สถานะ แล้วทิ้งภาพเมื่อ request จบ เจ้าหน้าที่ต้องตรวจรายการเดินบัญชีของสมาคม กรอกเลขอ้างอิงธุรกรรม และยืนยันผ่าน Access + CSRF ก่อน workflow จะเดินต่อ ฐานข้อมูลบังคับให้หนึ่งใบสมัครมี payment ได้เพียงรายการเดียว จึงกันทั้งการกดซ้ำและการยืนยันอัตโนมัติแข่งกับเจ้าหน้าที่
+
+อีเมล transactional ทุกฉบับ CC ไปยัง `EMAIL_CC` ยกเว้นเมื่อที่อยู่นั้นเป็นผู้รับหลักอยู่แล้ว เพื่อไม่ให้ส่งซ้ำ
 
 ## Receipts
 

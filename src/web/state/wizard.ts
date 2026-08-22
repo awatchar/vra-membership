@@ -1,5 +1,11 @@
 import type { AddressValues, ContactValues, IdentityValues } from './validation';
-import type { MembershipType, OcrFields, PaymentInstructions, WorkflowReport } from '../api/types';
+import type {
+  ManualPaymentReview,
+  MembershipType,
+  OcrFields,
+  PaymentInstructions,
+  WorkflowReport,
+} from '../api/types';
 
 /**
  * Wizard state.
@@ -27,6 +33,7 @@ export const WIZARD_STEPS = [
   'photo',
   'membership',
   'payment',
+  'payment-review',
   'confirmation',
 ] as const;
 
@@ -41,6 +48,7 @@ export const STEP_TITLES: Readonly<Record<WizardStep, string>> = {
   photo: 'รูปสำหรับบัตรสมาชิก',
   membership: 'ประเภทสมาชิก',
   payment: 'ชำระค่าบำรุงสมาชิก',
+  'payment-review': 'รอเจ้าหน้าที่ตรวจสอบการชำระเงิน',
   confirmation: 'สมัครเรียบร้อย',
 };
 
@@ -85,6 +93,7 @@ export interface WizardState {
   hasPreviousApplication: boolean;
 
   confirmation: WorkflowReport | null;
+  manualPaymentReview: ManualPaymentReview | null;
 }
 
 export const EMPTY_IDENTITY: IdentityValues = {
@@ -138,6 +147,7 @@ export const INITIAL_STATE: WizardState = {
   accessToken: null,
   hasPreviousApplication: false,
   confirmation: null,
+  manualPaymentReview: null,
 };
 
 export type WizardAction =
@@ -163,7 +173,8 @@ export type WizardAction =
       accessToken: string;
       hasPrevious: boolean;
     }
-  | { type: 'CONFIRMED'; report: WorkflowReport };
+  | { type: 'CONFIRMED'; report: WorkflowReport }
+  | { type: 'MANUAL_PAYMENT_REVIEW_REQUESTED'; review: ManualPaymentReview };
 
 /** Frees an object URL, so a discarded preview does not pin its blob in memory. */
 function release(image: HeldImage | null): void {
@@ -281,6 +292,17 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       release(state.slipImage);
       return { ...state, slipImage: null, confirmation: action.report, step: 'confirmation' };
     }
+
+    case 'MANUAL_PAYMENT_REVIEW_REQUESTED': {
+      release(state.slipImage);
+      return {
+        ...state,
+        slipImage: null,
+        slipQrPayload: null,
+        manualPaymentReview: action.review,
+        step: 'payment-review',
+      };
+    }
   }
 }
 
@@ -303,6 +325,7 @@ export function previousStep(state: WizardState): WizardStep | null {
   switch (state.step) {
     case 'privacy':
     case 'confirmation':
+    case 'payment-review':
       return null;
     case 'card':
       return 'privacy';
@@ -323,7 +346,14 @@ export function previousStep(state: WizardState): WizardStep | null {
   }
 }
 
-/** Progress for the step indicator: 1-based position and the total. */
+/**
+ * Progress for the step indicator: 1-based position and the total.
+ *
+ * Manual review is an alternative final outcome to confirmation, not an extra
+ * step every applicant must complete. Both therefore occupy step 9.
+ */
 export function stepPosition(step: WizardStep): { index: number; total: number } {
-  return { index: WIZARD_STEPS.indexOf(step) + 1, total: WIZARD_STEPS.length };
+  const index =
+    step === 'payment-review' || step === 'confirmation' ? 9 : WIZARD_STEPS.indexOf(step) + 1;
+  return { index, total: 9 };
 }

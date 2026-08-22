@@ -20,6 +20,10 @@ Cloudflare D1 migrations for the membership database. `wrangler.jsonc` points
   membership term and migrates legacy `ANNUAL` rows to `FIVE_YEAR`. The old
   column remains only as a compatibility mirror so the parent table and its
   foreign-key children never need a destructive SQLite rebuild.
+- `0007_add_manual_payment_reviews.sql` adds image-free manual-review state,
+  the manager review email type, and the one-payment-per-application database
+  guard. Roll back the Worker independently; repair schema with a new forward
+  migration rather than dropping the review table or indexes.
 
 ## Commands
 

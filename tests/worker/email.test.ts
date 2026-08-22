@@ -22,6 +22,7 @@ const NOW = new Date('2026-08-20T03:00:00.000Z');
 const MANAGER_EMAIL = 'manager@example.test';
 const APPLICANT_EMAIL = 'applicant@example.test';
 const APP_BASE_URL = 'https://membership.example.test';
+const CC_EMAIL = 'copy@example.test';
 
 interface Harness {
   repo: Repository;
@@ -33,6 +34,8 @@ async function harness(
   options: {
     failWith?: 'REJECTED' | 'PROVIDER_ERROR' | 'PROVIDER_TIMEOUT';
     maskCitizenId?: boolean;
+    managerEmail?: string;
+    ccEmail?: string;
   } = {},
 ): Promise<Harness> {
   const repo = repository();
@@ -42,7 +45,8 @@ async function harness(
   const receipts = createReceiptService(repo, numbering, audit, { now: () => NOW });
 
   const emails = createEmailService(repo, provider, receipts, audit, {
-    managerEmail: MANAGER_EMAIL,
+    managerEmail: options.managerEmail ?? MANAGER_EMAIL,
+    ccEmail: options.ccEmail ?? CC_EMAIL,
     appBaseUrl: APP_BASE_URL,
     now: () => NOW,
     ...(options.maskCitizenId === false
@@ -182,6 +186,27 @@ describe('receipt email', () => {
 });
 
 describe('manager email', () => {
+  it('copies the configured operational recipient', async () => {
+    const { repo, provider, emails } = await harness();
+    const id = await paidApplication(repo);
+
+    await emails.sendManagerNewApplication(id);
+
+    expect(provider.sent.at(-1)!.cc).toEqual([CC_EMAIL]);
+  });
+
+  it('does not duplicate the primary recipient as CC', async () => {
+    const { repo, provider, emails } = await harness({
+      managerEmail: CC_EMAIL.toUpperCase(),
+      ccEmail: CC_EMAIL,
+    });
+    const id = await paidApplication(repo);
+
+    await emails.sendManagerNewApplication(id);
+
+    expect(provider.sent.at(-1)!.cc).toBeUndefined();
+  });
+
   it('goes to the configured manager address, not the applicant', async () => {
     const { repo, provider, emails } = await harness();
     const id = await paidApplication(repo);

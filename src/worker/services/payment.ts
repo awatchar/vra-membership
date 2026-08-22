@@ -308,6 +308,11 @@ export function createPaymentService(
         );
       }
 
+      // An applicant may submit a clearer slip while a manual review is still
+      // pending. Automatic verification wins safely and removes that item from
+      // the manager queue without changing any of the payment checks above.
+      await db.paymentReviews.resolveIfPending(input.applicationId, 'AUTOMATICALLY_VERIFIED');
+
       return {
         payment,
         amountSatang: transaction.amount,

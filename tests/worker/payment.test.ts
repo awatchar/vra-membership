@@ -74,6 +74,19 @@ async function readyToPay(
 const QR = { kind: 'qr', payload: 'mock-qr-payload' } as const;
 
 describe('accepting a valid payment', () => {
+  it('resolves a pending manual review when a clearer slip verifies automatically', async () => {
+    const repo = repository();
+    const id = await readyToPay(repo);
+    await repo.paymentReviews.createIfMissing(id);
+
+    await service(repo).verify({ applicationId: id, evidence: QR });
+
+    await expect(repo.paymentReviews.findByApplicationId(id)).resolves.toMatchObject({
+      status: 'AUTOMATICALLY_VERIFIED',
+      resolvedBy: null,
+    });
+  });
+
   it('verifies a five-year payment and moves the application on', async () => {
     const repo = repository();
     const id = await readyToPay(repo);

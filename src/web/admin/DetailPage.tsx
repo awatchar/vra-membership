@@ -68,6 +68,9 @@ export function DetailPage({ applicationId, csrf, onOpen, onBack }: DetailPagePr
   const [citizenIdError, setCitizenIdError] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [transactionRef, setTransactionRef] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [approvingPayment, setApprovingPayment] = useState(false);
 
   const [attempt, setAttempt] = useState(0);
   const reload = () => setAttempt((previous) => previous + 1);
@@ -123,6 +126,19 @@ export function DetailPage({ applicationId, csrf, onOpen, onBack }: DetailPagePr
       .finally(() => setFinalizing(false));
   };
 
+  const approvePayment = () => {
+    if (approvingPayment || !paymentConfirmed || transactionRef.trim().length < 6) return;
+    setApprovingPayment(true);
+    setError(null);
+    adminApi
+      .approveManualPayment(applicationId, transactionRef, csrf)
+      .then(() => reload())
+      .catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught.message : 'ไม่สามารถยืนยันการชำระเงินได้');
+      })
+      .finally(() => setApprovingPayment(false));
+  };
+
   if (error && !detail) {
     return (
       <>
@@ -136,7 +152,7 @@ export function DetailPage({ applicationId, csrf, onOpen, onBack }: DetailPagePr
 
   if (!detail) return <p className="vra-muted">กำลังโหลด...</p>;
 
-  const { application, address, payment, receipt, workflow, events } = detail;
+  const { application, address, payment, paymentReview, receipt, workflow, events } = detail;
   const outstanding = STEP_ORDER.filter(
     (step) => workflow.steps[step] !== 'DONE' && workflow.steps[step] !== 'ALREADY_DONE',
   );
@@ -156,6 +172,44 @@ export function DetailPage({ applicationId, csrf, onOpen, onBack }: DetailPagePr
 
       <section className="vra-panel">
         <h2 className="vra-panel__title">การดำเนินการ</h2>
+
+        {paymentReview?.status === 'PENDING' && application.status === 'AWAITING_PAYMENT' ? (
+          <div className="vra-form-stack">
+            <Alert tone="info" title="รอตรวจสอบการชำระเงินโดยเจ้าหน้าที่">
+              <p>
+                ระบบอ่านสลิปไม่ได้และไม่ได้เก็บภาพไว้ กรุณาตรวจรายการเดินบัญชีของสมาคมให้พบยอด
+                {application.amountBaht ? ` ${application.amountBaht} บาท` : ''}
+                แล้วกรอกเลขอ้างอิงของธนาคารก่อนยืนยัน
+              </p>
+            </Alert>
+            <label className="vra-field">
+              <span className="vra-field__label">เลขอ้างอิงธุรกรรมจากรายการเดินบัญชี</span>
+              <input
+                className="vra-field__input"
+                value={transactionRef}
+                onChange={(event) => setTransactionRef(event.target.value)}
+                autoComplete="off"
+                maxLength={100}
+              />
+            </label>
+            <label className="vra-check">
+              <input
+                type="checkbox"
+                checked={paymentConfirmed}
+                onChange={(event) => setPaymentConfirmed(event.target.checked)}
+              />
+              <span>ยืนยันว่าตรวจพบยอดเงินเข้าบัญชีสมาคมและเลขอ้างอิงตรงกับรายการจริง</span>
+            </label>
+            <Button
+              onClick={approvePayment}
+              disabled={!paymentConfirmed || transactionRef.trim().length < 6}
+              busy={approvingPayment}
+              busyLabel="กำลังยืนยัน..."
+            >
+              ยืนยันการชำระเงินและดำเนินใบสมัครต่อ
+            </Button>
+          </div>
+        ) : null}
 
         {application.status === 'MANAGER_NOTIFIED' ? (
           <>
@@ -187,7 +241,7 @@ export function DetailPage({ applicationId, csrf, onOpen, onBack }: DetailPagePr
           </Alert>
         ) : null}
 
-        {outstanding.length > 0 ? (
+        {payment && outstanding.length > 0 ? (
           <>
             <Alert tone="info" title="มีขั้นตอนหลังการชำระเงินที่ยังไม่สำเร็จ">
               <ul>

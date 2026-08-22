@@ -14,7 +14,12 @@ import { createAuditLog } from '../services/audit';
 import { ACCESS_TOKEN_HASH_INFO, createApplicationAccess } from '../services/application-access';
 import { formatBaht, membershipPlan } from '../services/membership';
 import { createPaymentService } from '../services/payment';
+import { PaymentRejectedError } from '../services/payment';
 import type { AssociationAccount } from '../services/payment';
+import { createPaymentReviewService } from '../services/payment-review';
+import { createEmailService } from '../services/email';
+import { createNumberingService } from '../services/numbering';
+import { createReceiptService } from '../services/receipt';
 import { createStateMachine } from '../services/state-machine';
 import { buildApplicationWorkflow } from '../services/workflow-factory';
 
@@ -159,15 +164,56 @@ export const paymentRoutes = new Hono<AppContext>()
       throw new ApiError('BAD_REQUEST', MESSAGES.evidence);
     }
 
-    const service = createPaymentService(
-      c.var.db,
-      c.var.providers.slip,
-      createStateMachine(c.var.db),
-      createAuditLog(c.var.db),
-      associationAccount(c.env),
-    );
+    const audit = createAuditLog(c.var.db);
+    const machine = createStateMachine(c.var.db);
+    const account = associationAccount(c.env);
+    const service = createPaymentService(c.var.db, c.var.providers.slip, machine, audit, account);
 
-    const verified = await service.verify({ applicationId, evidence });
+    let verified;
+    try {
+      verified = await service.verify({ applicationId, evidence });
+    } catch (error) {
+      if (
+        evidence.kind !== 'image' ||
+        !(error instanceof PaymentRejectedError) ||
+        error.reason !== 'SLIP_UNREADABLE'
+      ) {
+        throw error;
+      }
+
+      const numbering = createNumberingService(c.var.db);
+      const receipts = createReceiptService(c.var.db, numbering, audit);
+      const emails = createEmailService(c.var.db, c.var.providers.email, receipts, audit, {
+        managerEmail: requireSecret(c.env, 'MANAGER_EMAIL'),
+        ccEmail: c.var.config.EMAIL_CC,
+        appBaseUrl: c.var.config.APP_BASE_URL,
+      });
+      const requested = await createPaymentReviewService(
+        c.var.db,
+        emails,
+        machine,
+        audit,
+        account,
+      ).request(applicationId);
+
+      c.var.logger.info({
+        event: 'payment.manual_review_requested',
+        applicationId,
+        reason: requested.created ? 'CREATED' : 'ALREADY_PENDING',
+      });
+      c.header('Cache-Control', 'no-store');
+      return c.json(
+        {
+          verified: false,
+          manualReview: true,
+          status: requested.review.status,
+          notificationSent: requested.notificationSent,
+          message:
+            'ส่งคำขอตรวจสอบการชำระเงินให้เจ้าหน้าที่แล้ว เจ้าหน้าที่จะตรวจรายการเดินบัญชีของสมาคมโดยไม่จัดเก็บรูปสลิป',
+        },
+        202,
+      );
+    }
 
     c.var.logger.info({
       event: 'payment.verified',

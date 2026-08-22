@@ -10,8 +10,8 @@ import { detailPath } from './route';
 /**
  * The application queue (Issue #1 section 52).
  *
- * The default filter is the two statuses that need the manager - waiting to be
- * picked up, and picked up but not yet recorded. A dashboard that opens on
+ * The default filter is work that needs the manager: unreadable payments,
+ * applications waiting to be picked up, and work not yet recorded. A dashboard that opens on
  * everything makes the manager do the filtering, and this queue is one or two
  * applications a day: what matters is what is outstanding.
  *
@@ -21,7 +21,11 @@ import { detailPath } from './route';
  * decide which application to open.
  */
 
-const OUTSTANDING: readonly ApplicationStatus[] = ['MANAGER_NOTIFIED', 'NBTC_PROCESSING'];
+const OUTSTANDING: readonly ApplicationStatus[] = [
+  'AWAITING_PAYMENT',
+  'MANAGER_NOTIFIED',
+  'NBTC_PROCESSING',
+];
 
 interface FilterOption {
   id: string;
@@ -84,7 +88,14 @@ export function QueuePage({ onOpen }: QueuePageProps) {
   }, [filterId, attempt]);
 
   const fresh = loaded?.filterId === filterId && loaded.attempt === attempt;
-  const items = fresh ? loaded.items : null;
+  const items = fresh
+    ? loaded.items.filter(
+        (item) =>
+          filterId !== 'outstanding' ||
+          item.status !== 'AWAITING_PAYMENT' ||
+          item.manualPaymentReview,
+      )
+    : null;
   const error = failure?.attempt === attempt ? failure.message : null;
   const busy = items === null && error === null;
   const reload = () => setAttempt((previous) => previous + 1);
@@ -152,6 +163,7 @@ export function QueuePage({ onOpen }: QueuePageProps) {
 
               <div className="vra-queue__meta">
                 <StatusBadge status={item.status} />
+                {item.manualPaymentReview ? <span>รอตรวจสอบการชำระเงินโดยเจ้าหน้าที่</span> : null}
                 {item.amountBaht ? <span>{item.amountBaht} บาท</span> : null}
                 <span className="vra-muted">
                   {item.submittedAt

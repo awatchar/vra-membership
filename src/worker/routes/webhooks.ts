@@ -68,6 +68,7 @@ export const webhookRoutes = new Hono<AppContext>().post('/webhooks/resend', asy
   const receipts = createReceiptService(db, numbering, audit);
   const emails = createEmailService(db, c.var.providers.email, receipts, audit, {
     managerEmail: requireSecret(c.env, 'MANAGER_EMAIL'),
+    ccEmail: c.var.config.EMAIL_CC,
     appBaseUrl: c.var.config.APP_BASE_URL,
   });
 

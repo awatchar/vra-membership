@@ -3,7 +3,7 @@ import { renderEmail } from './layout';
 import type { DetailRow, EmailBlock, RenderedEmail } from './layout';
 
 /**
- * The four transactional emails (Issue #1 section 55).
+ * The transactional emails (Issue #1 section 55 and Issue #58).
  *
  * Each template is a pure function of the data it is given: the caller resolves
  * every value from the database and passes it in. Nothing here reads a record,
@@ -193,7 +193,45 @@ export function managerNewApplicationEmail(data: ManagerNewApplicationEmailData)
   });
 }
 
-/* --------------------------------------- 3. processing, to the member ------- */
+/* ------------------------------ payment review request, to the manager ---- */
+
+export interface ManagerPaymentReviewEmailData {
+  applicantName: string;
+  membershipLabel: string;
+  amountBaht: string;
+  detailUrl: string;
+}
+
+export function managerPaymentReviewEmail(data: ManagerPaymentReviewEmailData): RenderedEmail {
+  const blocks: EmailBlock[] = [
+    {
+      kind: 'paragraph',
+      text: 'ผู้สมัครส่งภาพสลิปแล้ว แต่ระบบอัตโนมัติไม่สามารถอ่านข้อมูลธุรกรรมได้',
+    },
+    {
+      kind: 'details',
+      rows: [
+        { label: 'ชื่อ-นามสกุล', value: data.applicantName },
+        { label: 'ประเภทสมาชิก', value: data.membershipLabel },
+        { label: 'ยอดที่ต้องตรวจสอบ', value: `${data.amountBaht} บาท` },
+      ],
+    },
+    {
+      kind: 'note',
+      text: 'ระบบไม่ได้เก็บหรือแนบรูปสลิป กรุณาตรวจรายการเดินบัญชีของสมาคม แล้วกรอกเลขอ้างอิงธุรกรรมในหน้ารายละเอียดก่อนยืนยันการชำระเงิน',
+    },
+    { kind: 'button', href: data.detailUrl, label: 'เปิดคำขอตรวจสอบการชำระเงิน' },
+  ];
+
+  return renderEmail({
+    subject: `[ตรวจสอบการชำระเงิน] ${data.applicantName}`,
+    preheader: `${data.membershipLabel} — ${data.amountBaht} บาท`,
+    heading: 'มีรายการชำระเงินรอตรวจสอบโดยเจ้าหน้าที่',
+    blocks,
+  });
+}
+
+/* --------------------------------------- processing, to the member ---------- */
 
 export interface MemberProcessingEmailData {
   recipientName: string;
