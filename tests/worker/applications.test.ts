@@ -66,6 +66,42 @@ async function createApplication(citizenId = CITIZEN_ID, ip = '203.0.113.40') {
   return response.json<CreatedBody>();
 }
 
+async function prepareForMembership(
+  options: { identity?: boolean; contact?: boolean; address?: boolean; photo?: boolean } = {},
+) {
+  const include = {
+    identity: options.identity ?? true,
+    contact: options.contact ?? true,
+    address: options.address ?? true,
+    photo: options.photo ?? true,
+  };
+  const response = await exports.default.fetch(
+    createRequest({
+      citizenId: CITIZEN_ID,
+      ...(include.identity ? { firstName: 'ทดสอบ', lastName: 'พร้อมชำระ' } : {}),
+    }),
+  );
+  expect(response.status).toBe(201);
+  const created = await response.json<CreatedBody>();
+
+  if (include.contact || include.address) {
+    const update = await exports.default.fetch(
+      patchRequest(created.application.id, created.accessToken, {
+        ...(include.contact ? { email: 'member@example.test', phone: '0800000000' } : {}),
+        ...(include.address ? { address: VALID_ADDRESS } : {}),
+      }),
+    );
+    expect(update.status).toBe(200);
+  }
+  if (include.photo) {
+    await repository().applications.setPhoto(created.application.id, {
+      key: `member-photos/${created.application.id}.jpg`,
+      source: 'UPLOAD',
+    });
+  }
+  return created;
+}
+
 describe('POST /api/applications', () => {
   it('creates an application and returns the capability token once', async () => {
     const body = await createApplication();
@@ -265,7 +301,7 @@ describe('PATCH /api/applications/:id', () => {
   });
 
   it('resolves the membership amount on the server', async () => {
-    const created = await createApplication();
+    const created = await prepareForMembership();
 
     const response = await exports.default.fetch(
       patchRequest(created.application.id, created.accessToken, { membershipType: 'LIFETIME' }),
@@ -282,7 +318,7 @@ describe('PATCH /api/applications/:id', () => {
   });
 
   it('moves into payment once and keeps membership changes idempotent there', async () => {
-    const created = await createApplication();
+    const created = await prepareForMembership();
 
     const first = await exports.default.fetch(
       patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
@@ -323,6 +359,31 @@ describe('PATCH /api/applications/:id', () => {
 
     const record = await repository().applications.findById(created.application.id);
     expect(record?.membershipAmountSatang).toBeNull();
+  });
+
+  it.each([
+    ['identity', { identity: false }],
+    ['contact', { contact: false }],
+    ['address', { address: false }],
+    ['member photo', { photo: false }],
+  ] as const)('refuses membership selection when %s data is incomplete', async (_label, missing) => {
+    const created = await prepareForMembership(missing);
+
+    const response = await exports.default.fetch(
+      patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'VALIDATION_FAILED' },
+    });
+    await expect(repository().applications.findById(created.application.id)).resolves.toMatchObject(
+      {
+        status: 'DRAFT',
+        membershipType: null,
+        membershipAmountSatang: null,
+      },
+    );
   });
 
   it('stores an address that copies the ID card', async () => {
@@ -442,7 +503,7 @@ describe('PATCH /api/applications/:id', () => {
   });
 
   it('records the membership choice in the audit trail', async () => {
-    const created = await createApplication();
+    const created = await prepareForMembership();
     await exports.default.fetch(
       patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
     );

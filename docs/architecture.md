@@ -328,6 +328,8 @@ PAYMENT_VERIFIED → ออกเลขที่ใบสมัคร → RECEIP
 - `GET /api/applications/:id/confirmation` อ่านสถานะแต่ละขั้น (หัวข้อ 66) **อ่านอย่างเดียว** — การ resume จาก GET จะทำให้การ refresh หน้า, prefetch หรือ link preview ส่งอีเมลได้
 - `POST /api/applications/:id/finalize` เดินขั้นที่ค้างให้จบ ใช้ capability token เดิมกับที่ยืนยันการชำระเงิน และมี rate limit เพราะเรียก provider ได้ ฝั่งผู้จัดการจะได้ action เทียบเท่าที่ไม่ต้องใช้ token ของผู้สมัครใน #16
 
+ก่อนบันทึกประเภทสมาชิกและเปลี่ยนเป็น `AWAITING_PAYMENT` Worker อ่านข้อมูลที่ persist แล้วและตรวจซ้ำว่ามีชื่อ-นามสกุล อีเมล โทรศัพท์ ที่อยู่ตามบัตร/ที่อยู่จัดส่งพร้อมรหัสไปรษณีย์ และรูปสมาชิกที่เลือกครบ การตรวจนี้เป็น business boundary ฝั่ง server ไม่อาศัยเพียง validation ของ wizard และ payment service ตรวจ invariant เดิมอีกครั้งก่อนเรียก provider เพื่อปิดทางของ record เก่าหรือ client ที่เรียก API เอง
+
 ## Admin
 
 **ทุก route ตรวจ Access JWT ในตัว Worker เอง ไม่ใช่พึ่งการตั้งค่าที่ edge เท่านั้น** Access ที่วางไว้หน้า `/admin*` และ `/api/admin/*` คือ setting เดียวใน dashboard — ถ้ามันถูกลบ, ถูกผูกกับ hostname ผิด หรือ path ไม่ตรง ทุก endpoint จะกลายเป็นสาธารณะทันที การตรวจซ้ำในนี้ทำให้ความผิดพลาดใน dashboard มีราคาเท่ากับ downtime ไม่ใช่ข้อมูลรั่ว

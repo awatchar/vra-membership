@@ -3,6 +3,7 @@ import type { PaymentRecord, Repository } from '../db';
 import { ApiError } from '../lib/http';
 import type { SlipEvidence, SlipVerificationProvider } from '../providers';
 import type { AuditLog } from './audit';
+import { assertApplicationCompleteForPayment } from './application';
 import { membershipPlan } from './membership';
 import type { StateMachine } from './state-machine';
 
@@ -170,6 +171,12 @@ export function createPaymentService(
         application.status === 'DRAFT' &&
         application.membershipType !== null &&
         (await db.payments.findByApplicationId(input.applicationId)).length === 0;
+      if (
+        (application.status === 'AWAITING_PAYMENT' && application.membershipType !== null) ||
+        legacyDraftHasNoPayment
+      ) {
+        await assertApplicationCompleteForPayment(db, input.applicationId);
+      }
       if (legacyDraftHasNoPayment) {
         await stateMachine.transition(input.applicationId, 'AWAITING_PAYMENT', {
           actorType: 'APPLICANT',

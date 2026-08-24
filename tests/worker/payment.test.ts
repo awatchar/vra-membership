@@ -55,6 +55,32 @@ function service(repo: Repository, slipOptions: MockSlipOptions = {}, now: () =>
   );
 }
 
+async function completeApplication(repo: Repository, id: string): Promise<void> {
+  await repo.applications.updateContact(id, {
+    email: 'applicant@example.test',
+    phone: '0800000000',
+    callsign: null,
+  });
+  await repo.addresses.upsert(id, {
+    idAddress: '999 หมู่ 9',
+    idSubdistrict: 'ตัวอย่าง',
+    idDistrict: 'ตัวอย่าง',
+    idProvince: 'กรุงเทพมหานคร',
+    mailSameAsId: true,
+    mailRecipient: null,
+    mailAddress: '999 หมู่ 9',
+    mailSubdistrict: 'ตัวอย่าง',
+    mailDistrict: 'ตัวอย่าง',
+    mailProvince: 'กรุงเทพมหานคร',
+    mailPostcode: '10200',
+    mailPhone: null,
+  });
+  await repo.applications.setPhoto(id, {
+    key: `member-photos/${id}.jpg`,
+    source: 'UPLOAD',
+  });
+}
+
 /** An application selected a membership and is awaiting payment. */
 async function readyToPay(
   repo: Repository,
@@ -62,6 +88,7 @@ async function readyToPay(
   membership: 'FIVE_YEAR' | 'LIFETIME' = 'FIVE_YEAR',
 ): Promise<string> {
   const id = await seedApplication(repo, citizenId);
+  await completeApplication(repo, id);
   await repo.applications.setMembership(
     id,
     membership,
@@ -486,6 +513,7 @@ describe('a payment that is not expected', () => {
   it('repairs a legacy draft whose server-resolved membership was already stored', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
+    await completeApplication(repo, id);
     await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
 
     await expect(service(repo).verify({ applicationId: id, evidence: QR })).resolves.toMatchObject({
@@ -499,6 +527,7 @@ describe('a payment that is not expected', () => {
   it('repairs the legacy status before contacting the provider', async () => {
     const repo = repository();
     const id = await seedApplication(repo);
+    await completeApplication(repo, id);
     await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
 
     const error = await service(repo, { failWith: 'PROVIDER_TIMEOUT' })
@@ -506,6 +535,23 @@ describe('a payment that is not expected', () => {
       .catch((reason: unknown) => reason);
 
     expect((error as PaymentRejectedError).reason).toBe('PROVIDER_UNAVAILABLE');
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({
+      status: 'AWAITING_PAYMENT',
+    });
+  });
+
+  it('refuses an incomplete awaiting-payment record before contacting the provider', async () => {
+    const repo = repository();
+    const id = await seedApplication(repo);
+    await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
+    await createStateMachine(repo).transition(id, 'AWAITING_PAYMENT');
+
+    const error = await service(repo, { failWith: 'PROVIDER_TIMEOUT' })
+      .verify({ applicationId: id, evidence: QR })
+      .catch((reason: unknown) => reason);
+
+    expect(error).toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(repo.payments.findByApplicationId(id)).resolves.toEqual([]);
     await expect(repo.applications.findById(id)).resolves.toMatchObject({
       status: 'AWAITING_PAYMENT',
     });
