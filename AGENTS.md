@@ -28,6 +28,7 @@ This file is the repository contract for every human or AI agent. More specific 
 - Record durable decisions in `docs/`; record transient progress and handoffs in the Issue or PR, not in new ad-hoc files.
 - A handoff must state completed work, remaining work, files changed, commands and results, risks, assumptions, and the next safe action.
 - Do not merge your own high-risk PR without human review.
+- GitHub enforces the human decision with the required `Human approval` check backed by the protected `human-review` environment. Because this personal repository has one collaborator, the environment permits owner self-review; the approval must still come from the human owner and be recorded in the Issue or PR. An AI agent must not infer or manufacture that approval.
 
 ## Verification
 

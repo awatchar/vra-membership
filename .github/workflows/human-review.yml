@@ -1,0 +1,30 @@
+name: Owner approval
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owner-approval-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  approval:
+    name: Human approval
+    if: ${{ github.event.pull_request.draft == false }}
+    environment: human-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Record protected-environment approval
+        run: echo "Repository owner approved this pull request for merge."
