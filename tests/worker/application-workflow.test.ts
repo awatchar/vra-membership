@@ -435,7 +435,7 @@ async function createApplication(citizenId: string): Promise<CreatedBody> {
         'cf-connecting-ip': '203.0.113.77',
         [TURNSTILE_TOKEN_HEADER]: 'test-token',
       },
-      body: JSON.stringify({ citizenId }),
+      body: JSON.stringify({ citizenId, firstName: 'ทดสอบ', lastName: 'พร้อมชำระ' }),
     }),
   );
   expect(response.status).toBe(201);
@@ -447,15 +447,37 @@ async function readyToPay(repo: Repository, citizenId: string) {
   const created = await createApplication(citizenId);
   const id = created.application.id;
 
-  await exports.default.fetch(
+  const details = await exports.default.fetch(
     new Request(`http://localhost/api/applications/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json', [ACCESS_TOKEN_HEADER]: created.accessToken },
-      body: JSON.stringify({ email: APPLICANT_EMAIL, phone: '0800000000' }),
+      body: JSON.stringify({
+        email: APPLICANT_EMAIL,
+        phone: '0800000000',
+        address: {
+          idAddress: '999 หมู่ 9',
+          idSubdistrict: 'ตัวอย่าง',
+          idDistrict: 'ตัวอย่าง',
+          idProvince: 'กรุงเทพมหานคร',
+          mailSameAsId: true,
+          mailPostcode: '10200',
+        },
+      }),
     }),
   );
-  await repo.applications.setMembership(id, 'FIVE_YEAR', FIVE_YEAR_SATANG);
-  await createStateMachine(repo).transition(id, 'AWAITING_PAYMENT');
+  expect(details.status).toBe(200);
+  await repo.applications.setPhoto(id, {
+    key: `member-photos/${id}.jpg`,
+    source: 'UPLOAD',
+  });
+  const membership = await exports.default.fetch(
+    new Request(`http://localhost/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', [ACCESS_TOKEN_HEADER]: created.accessToken },
+      body: JSON.stringify({ membershipType: 'FIVE_YEAR' }),
+    }),
+  );
+  expect(membership.status).toBe(200);
 
   return { id, token: created.accessToken };
 }

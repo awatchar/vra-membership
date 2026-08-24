@@ -366,25 +366,28 @@ describe('PATCH /api/applications/:id', () => {
     ['contact', { contact: false }],
     ['address', { address: false }],
     ['member photo', { photo: false }],
-  ] as const)('refuses membership selection when %s data is incomplete', async (_label, missing) => {
-    const created = await prepareForMembership(missing);
+  ] as const)(
+    'refuses membership selection when %s data is incomplete',
+    async (_label, missing) => {
+      const created = await prepareForMembership(missing);
 
-    const response = await exports.default.fetch(
-      patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
-    );
+      const response = await exports.default.fetch(
+        patchRequest(created.application.id, created.accessToken, { membershipType: 'FIVE_YEAR' }),
+      );
 
-    expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: 'VALIDATION_FAILED' },
-    });
-    await expect(repository().applications.findById(created.application.id)).resolves.toMatchObject(
-      {
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'VALIDATION_FAILED' },
+      });
+      await expect(
+        repository().applications.findById(created.application.id),
+      ).resolves.toMatchObject({
         status: 'DRAFT',
         membershipType: null,
         membershipAmountSatang: null,
-      },
-    );
-  });
+      });
+    },
+  );
 
   it('stores an address that copies the ID card', async () => {
     const created = await createApplication();
