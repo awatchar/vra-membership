@@ -27,6 +27,8 @@ Effective date: 21 August 2026
 | Rate-limit counters                                                                         | จบ window                               | ลบ opportunistically เมื่อมี request ใหม่                                                                                             | ตาม window                                      |
 | Worker logs                                                                                 | ตาม Cloudflare plan                     | ใช้เฉพาะ allowlisted technical metadata; ไม่ export เป็น archive ถาวร                                                                 | ค่า platform ที่สั้นที่สุดที่ operations ใช้ได้ |
 
+`payment_reviews.resolved_by` ใช้ค่าว่างหลัง erasure แทน `NULL` เพราะ schema กำหนดว่า review สถานะ `APPROVED` ต้องมีค่า non-null ขณะเดียวกันค่าว่างไม่สามารถระบุตัวผู้จัดการได้และคงหลักฐานสถานะการอนุมัติไว้ตามรอบบัญชี
+
 สถานะที่ยังดำเนินการ (`PAYMENT_VERIFIED`, `SUBMITTED`, `MANAGER_NOTIFIED`, `NBTC_PROCESSING`, `REFUND_REQUIRED`) ไม่ถูกลบอัตโนมัติ ให้ operations ตรวจรายการค้างและแก้ workflow ก่อน
 
 ## Implementation

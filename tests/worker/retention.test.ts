@@ -78,6 +78,11 @@ async function insertPersonalChildren(applicationId: string, createdAt: string):
          id, application_id, event_type, actor_type, actor_id, created_at
        ) values (?, ?, 'STATUS_CHANGED', 'MANAGER', 'manager@example.test', ?)`,
     ).bind(`event-${applicationId}`, applicationId, createdAt),
+    env.DB.prepare(
+      `insert into payment_reviews (
+         application_id, reason, status, requested_at, resolved_at, resolved_by
+       ) values (?, 'SLIP_UNREADABLE', 'APPROVED', ?, ?, 'manager@example.test')`,
+    ).bind(applicationId, createdAt, createdAt),
   ]);
 }
 
@@ -207,6 +212,11 @@ describe('production retention lifecycle', () => {
         "select actor_id from application_events where id = 'event-completed'",
       ).first(),
     ).toEqual({ actor_id: null });
+    expect(
+      await env.DB.prepare(
+        "select status, resolved_by from payment_reviews where application_id = 'completed'",
+      ).first(),
+    ).toEqual({ status: 'APPROVED', resolved_by: '' });
     expect(
       await env.DB.prepare(
         "select count(*) as count from application_events where application_id = 'completed' and event_type = 'PII_ERASED'",
