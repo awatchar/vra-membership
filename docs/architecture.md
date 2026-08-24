@@ -382,7 +382,7 @@ checklist ยืนยันเป็นสามข้อ ไม่ใช่ข
 
 ตามการตัดสินใจของเจ้าของระบบใน #52 รูปที่เลือกถูกส่งทั้งเฟรมโดยไม่มี crop UI และไม่มีการตัด pixel ทั้งภาพจาก iApp และภาพอัปโหลดใหม่ยังมี preview กับ checklist เดิม ภาพขนาดใหญ่ถูกย่อตามสัดส่วนและ encode เป็น JPEG บน canvas จึงตัด EXIF/GPS ก่อนออกจากเครื่อง ส่วน JPEG ที่เล็กพอจะไม่ถูก encode ซ้ำ แต่ Worker strip metadata ก่อนเก็บอีกชั้นหนึ่ง Worker ไม่บังคับ aspect ratio แล้ว แต่ยังบังคับขนาดไฟล์ ช่วงความละเอียด magic bytes และ JPEG-only storage
 
-`POST /api/member-photo` เป็น public endpoint ที่มีทั้งค่า Worker/R2 และข้อมูลส่วนบุคคล จึงใช้ Turnstile เหมือน OCR และ payment หน้า photo render challenge ของตัวเองและส่ง token ใน header เท่านั้น token จาก OCR หรือการสร้างใบสมัครถูกล้างเมื่อใช้หรือออกจากขั้น เพื่อไม่ให้ challenge แบบ single-use ถูกนำกลับมาใช้เงียบ ๆ
+`POST /api/member-photo` เป็น public endpoint ที่มีทั้งค่า Worker/R2 และข้อมูลส่วนบุคคล จึงใช้ Turnstile เหมือน OCR และ payment พร้อมตรวจ applicant capability token ของใบสมัครก่อนอ่าน bytes หรือเขียน D1/R2 หน้า photo render challenge ของตัวเองและส่ง Turnstile token ใน header เท่านั้น token จาก OCR หรือการสร้างใบสมัครถูกล้างเมื่อใช้หรือออกจากขั้น เพื่อไม่ให้ challenge แบบ single-use ถูกนำกลับมาใช้เงียบ ๆ
 
 ### สลิป
 

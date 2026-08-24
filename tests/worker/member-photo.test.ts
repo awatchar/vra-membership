@@ -1,5 +1,10 @@
 import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
+import { createKeyedHasher } from '../../src/worker/lib/crypto';
+import {
+  ACCESS_TOKEN_HASH_INFO,
+  ACCESS_TOKEN_HEADER,
+} from '../../src/worker/services/application-access';
 import { createAuditLog } from '../../src/worker/services/audit';
 import { createMemberPhotoService } from '../../src/worker/services/member-photo';
 import { createStateMachine } from '../../src/worker/services/state-machine';
@@ -10,9 +15,12 @@ import {
   repository,
   seedApplication,
   TEST_CITIZEN_ID,
+  TEST_KEY,
 } from '../support/fixtures';
 
 const GPS_MARKER = 'GPSLatitude=13.7563';
+const TEST_ACCESS_TOKEN = 'a'.repeat(64);
+const OTHER_ACCESS_TOKEN = 'b'.repeat(64);
 
 function service(repo = repository()) {
   return createMemberPhotoService(repo, env.MEMBER_PHOTOS, createAuditLog(repo));
@@ -27,6 +35,19 @@ async function objectText(key: string): Promise<string> {
   const object = await env.MEMBER_PHOTOS.get(key);
   const bytes = new Uint8Array(await object!.arrayBuffer());
   return new TextDecoder('latin1').decode(bytes);
+}
+
+async function seedAccessibleApplication(
+  repo: ReturnType<typeof repository>,
+  citizenId: string = TEST_CITIZEN_ID,
+  token: string = TEST_ACCESS_TOKEN,
+): Promise<string> {
+  const id = await seedApplication(repo, citizenId);
+  const hasher = await createKeyedHasher(TEST_KEY, ACCESS_TOKEN_HASH_INFO);
+  await env.DB.prepare('update applications set access_token_hash = ? where id = ?')
+    .bind(await hasher.hash(token), id)
+    .run();
+  return id;
 }
 
 describe('storing a member photo', () => {
@@ -346,6 +367,7 @@ function photoRequest(form: FormData, headers: Record<string, string> = {}): Req
     headers: {
       'cf-connecting-ip': '203.0.113.30',
       [TURNSTILE_TOKEN_HEADER]: 'test-token',
+      [ACCESS_TOKEN_HEADER]: TEST_ACCESS_TOKEN,
       ...headers,
     },
     body: form,
@@ -355,7 +377,7 @@ function photoRequest(form: FormData, headers: Record<string, string> = {}): Req
 describe('POST /api/member-photo', () => {
   it('stores the photo and reports the shape without leaking the key', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(photoRequest(photoForm(id)));
 
@@ -369,7 +391,7 @@ describe('POST /api/member-photo', () => {
 
   it('refuses a request with no Turnstile token', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(
       photoRequest(photoForm(id), { [TURNSTILE_TOKEN_HEADER]: '' }),
@@ -379,9 +401,36 @@ describe('POST /api/member-photo', () => {
     await expect(objectKeys()).resolves.toEqual([]);
   });
 
+  it('refuses a request with no applicant capability token', async () => {
+    const repo = repository();
+    const id = await seedAccessibleApplication(repo);
+
+    const response = await exports.default.fetch(
+      photoRequest(photoForm(id), { [ACCESS_TOKEN_HEADER]: '' }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(objectKeys()).resolves.toEqual([]);
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({ photoKey: null });
+  });
+
+  it('refuses a capability token issued for another application', async () => {
+    const repo = repository();
+    const id = await seedAccessibleApplication(repo);
+    await seedAccessibleApplication(repo, OTHER_TEST_CITIZEN_ID, OTHER_ACCESS_TOKEN);
+
+    const response = await exports.default.fetch(
+      photoRequest(photoForm(id), { [ACCESS_TOKEN_HEADER]: OTHER_ACCESS_TOKEN }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(objectKeys()).resolves.toEqual([]);
+    await expect(repo.applications.findById(id)).resolves.toMatchObject({ photoKey: null });
+  });
+
   it('refuses when the confirmation is absent', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(
       photoRequest(photoForm(id, { confirmed: 'false' })),
@@ -393,7 +442,7 @@ describe('POST /api/member-photo', () => {
 
   it('refuses an unknown photo source', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(
       photoRequest(photoForm(id, { source: 'SCANNED' })),
@@ -404,7 +453,7 @@ describe('POST /api/member-photo', () => {
 
   it('refuses a file that is not really an image', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 
     const response = await exports.default.fetch(photoRequest(photoForm(id, { bytes: pdf })));
@@ -415,7 +464,7 @@ describe('POST /api/member-photo', () => {
 
   it('refuses a PNG, because its metadata is not rewritten', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(
       photoRequest(photoForm(id, { bytes: makePng(600, 800) })),
@@ -426,7 +475,7 @@ describe('POST /api/member-photo', () => {
 
   it('stores a full square photo without requiring a 3:4 crop', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(
       photoRequest(photoForm(id, { bytes: makeMemberPhoto({ width: 800, height: 800 }) })),
@@ -438,15 +487,21 @@ describe('POST /api/member-photo', () => {
 
   it('stores a low-resolution iApp face but rejects identical upload bytes', async () => {
     const repo = repository();
-    const idFaceApplication = await seedApplication(repo, TEST_CITIZEN_ID);
-    const uploadApplication = await seedApplication(repo, OTHER_TEST_CITIZEN_ID);
+    const idFaceApplication = await seedAccessibleApplication(repo, TEST_CITIZEN_ID);
+    const uploadApplication = await seedAccessibleApplication(
+      repo,
+      OTHER_TEST_CITIZEN_ID,
+      OTHER_ACCESS_TOKEN,
+    );
     const bytes = makeMemberPhoto({ width: 150, height: 200 });
 
     const idFaceResponse = await exports.default.fetch(
       photoRequest(photoForm(idFaceApplication, { source: 'ID_CARD', bytes })),
     );
     const uploadResponse = await exports.default.fetch(
-      photoRequest(photoForm(uploadApplication, { source: 'UPLOAD', bytes })),
+      photoRequest(photoForm(uploadApplication, { source: 'UPLOAD', bytes }), {
+        [ACCESS_TOKEN_HEADER]: OTHER_ACCESS_TOKEN,
+      }),
     );
 
     expect(idFaceResponse.status).toBe(200);
@@ -461,7 +516,7 @@ describe('POST /api/member-photo', () => {
 
   it('refuses a request with no file', async () => {
     const repo = repository();
-    const id = await seedApplication(repo);
+    const id = await seedAccessibleApplication(repo);
 
     const response = await exports.default.fetch(photoRequest(photoForm(id, { omitFile: true })));
 
