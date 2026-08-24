@@ -116,6 +116,12 @@ async function erasePii(
         .bind(row.id),
       db
         .prepare(
+          `update payment_reviews set resolved_by = ''
+           where application_id = ? and resolved_by is not null`,
+        )
+        .bind(row.id),
+      db
+        .prepare(
           `insert into application_events (
              id, application_id, event_type, metadata_json, actor_type, actor_id, created_at
            )
