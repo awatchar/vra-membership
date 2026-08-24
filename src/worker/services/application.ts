@@ -29,6 +29,8 @@ const MESSAGES = {
   notEditable: 'ใบสมัครนี้อยู่ในขั้นตอนที่ไม่สามารถแก้ไขข้อมูลได้แล้ว',
   mailPostcode: 'กรุณากรอกรหัสไปรษณีย์สำหรับที่อยู่จัดส่งเอกสาร',
   mailRecipient: 'กรุณากรอกชื่อผู้รับและที่อยู่สำหรับจัดส่งเอกสาร',
+  incomplete:
+    'กรุณากรอกข้อมูลผู้สมัคร ข้อมูลติดต่อ ที่อยู่จัดส่ง และเลือกรูปสมาชิกให้ครบก่อนชำระเงิน',
 } as const;
 
 /** Statuses in which the applicant may still change their own data. */
@@ -198,6 +200,44 @@ function toAddressRow(address: ApplicantAddressInput): AddressInput {
   };
 }
 
+function hasText(value: string | null): boolean {
+  return value !== null && value.trim().length > 0;
+}
+
+/**
+ * Enforces the server-side business boundary before any payment work.
+ *
+ * The browser validates each wizard step for usability, but a capability holder
+ * may call the API directly. Required data is therefore checked again against
+ * the persisted record instead of trusting that the normal UI was followed.
+ */
+export async function assertApplicationCompleteForPayment(
+  db: Repository,
+  applicationId: string,
+): Promise<ApplicationRecord> {
+  const [application, address] = await Promise.all([
+    db.applications.findById(applicationId),
+    db.addresses.findByApplicationId(applicationId),
+  ]);
+  if (!application) throw new ApiError('NOT_FOUND', MESSAGES.notFound);
+
+  const identityComplete = hasText(application.firstName) && hasText(application.lastName);
+  const contactComplete = hasText(application.email) && hasText(application.phone);
+  const addressComplete =
+    address !== null &&
+    hasText(address.idAddress) &&
+    hasText(address.idProvince) &&
+    hasText(address.mailAddress) &&
+    hasText(address.mailProvince) &&
+    hasText(address.mailPostcode);
+  const photoComplete = hasText(application.photoKey);
+
+  if (!identityComplete || !contactComplete || !addressComplete || !photoComplete) {
+    throw new ApiError('VALIDATION_FAILED', MESSAGES.incomplete);
+  }
+  return application;
+}
+
 export function createApplicationService(
   db: Repository,
   protection: CitizenIdProtection,
@@ -295,6 +335,8 @@ export function createApplicationService(
       }
 
       if (input.membershipType) {
+        await assertApplicationCompleteForPayment(db, applicationId);
+
         // Resolved from the catalogue. An amount from the client is not read at
         // all, so there is nothing to ignore.
         const plan = membershipPlan(input.membershipType);
