@@ -2,12 +2,15 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from '../context';
 import { PHOTO_SOURCES } from '../db';
+import { requireSecret } from '../env';
+import { createKeyedHasher } from '../lib/crypto';
 import { validateImageBytes } from '../lib/files';
 import { ApiError } from '../lib/http';
 import { assertWithinRateLimit, clientIdentifier, PHOTO_POLICY } from '../security/rate-limit';
 import { assertHumanRequest } from '../security/turnstile';
 import { parseWithSchema } from '../security/validation';
 import { createAuditLog } from '../services/audit';
+import { ACCESS_TOKEN_HASH_INFO, createApplicationAccess } from '../services/application-access';
 import { createMemberPhotoService } from '../services/member-photo';
 
 /**
@@ -37,6 +40,11 @@ const MESSAGES = {
   tooLarge: 'ไฟล์รูปมีขนาดใหญ่เกินกำหนด กรุณาย่อขนาดรูป',
 } as const;
 
+async function accessFor(env: AppContext['Bindings'], db: AppContext['Variables']['db']) {
+  const keyMaterial = requireSecret(env, 'PII_ENCRYPTION_KEY');
+  return createApplicationAccess(db, await createKeyedHasher(keyMaterial, ACCESS_TOKEN_HASH_INFO));
+}
+
 export const memberPhotoRoutes = new Hono<AppContext>().post('/member-photo', async (c) => {
   await assertHumanRequest(c.var.security.turnstile, c.req.raw);
   await assertWithinRateLimit(
@@ -63,6 +71,12 @@ export const memberPhotoRoutes = new Hono<AppContext>().post('/member-photo', as
     source: form.get('source'),
     confirmed: form.get('confirmed'),
   });
+
+  // The UUID appears in browser history and support material, so it is not an
+  // applicant credential. Authorize the capability before reading image bytes
+  // or changing D1/R2, just like every other post-creation applicant route.
+  const access = await accessFor(c.env, c.var.db);
+  await access.authorize(c.req.raw, metadata.applicationId);
 
   const file = form.get('photo');
   if (!(file instanceof File)) {
